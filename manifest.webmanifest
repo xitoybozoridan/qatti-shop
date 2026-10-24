@@ -1,6 +1,6 @@
 {
-  "name": "Qatti Shop",
-  "short_name": "Qatti Shop",
+  "name": "qSHOP",
+  "short_name": "qSHOP",
   "description": "Xitoy tovarlari guruh bilan arzon",
   "start_url": "./index.html",
   "scope": "./",

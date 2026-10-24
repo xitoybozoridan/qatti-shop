@@ -1,0 +1,58 @@
+{
+  "config": {
+    "shopName": "Qatti Shop",
+    "adminTelegram": "",
+    "adminPhone": "",
+    "currency": "so'm"
+  },
+  "products": [
+    {
+      "id": 1,
+      "name": "Simsiz quloqchin (Bluetooth 5.3)",
+      "emoji": "🎧",
+      "img": "",
+      "price": 89000,
+      "oldPrice": 140000,
+      "groupSize": 5,
+      "joined": 3,
+      "hoursLeft": 20,
+      "desc": "Shovqinni kamaytiradi, 24 soat batareya. Guruh to'lsa narx arzonlashadi."
+    },
+    {
+      "id": 2,
+      "name": "Smart soat (suv o'tkazmaydi)",
+      "emoji": "⌚",
+      "img": "",
+      "price": 119000,
+      "oldPrice": 190000,
+      "groupSize": 4,
+      "joined": 1,
+      "hoursLeft": 36,
+      "desc": "Qadam sanagich, yurak urishi, qo'ng'iroq bildirishnomalari."
+    },
+    {
+      "id": 3,
+      "name": "Ayollar sumkasi (ekokozha)",
+      "emoji": "👜",
+      "img": "",
+      "price": 145000,
+      "oldPrice": 230000,
+      "groupSize": 3,
+      "joined": 2,
+      "hoursLeft": 8,
+      "desc": "3 xil rang, ichki cho'ntaklari ko'p."
+    },
+    {
+      "id": 4,
+      "name": "LED chiroq (stol uchun)",
+      "emoji": "💡",
+      "img": "",
+      "price": 59000,
+      "oldPrice": 95000,
+      "groupSize": 6,
+      "joined": 4,
+      "hoursLeft": 48,
+      "desc": "3 rejim, USB bilan zaryadlanadi, ko'z uchun qulay."
+    }
+  ]
+}

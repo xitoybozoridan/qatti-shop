@@ -159,9 +159,11 @@ label{font-size:12px;color:var(--muted);display:block;margin:0 0 4px 2px}
     return '<span class="st">' + t[0] + '</span><div class="bar" style="margin-top:6px"><i style="width:' + (t[1] * 20) + '%"></i></div>';
   }
   async function refreshStatuses(){
-    if (!sb || !state.orders.length) return;
+    if (!sb) return;
+    if (state.token) await loadMyOrders();
+    if (!state.orders.length) return;
     var byPhone = {};
-    state.orders.forEach(function(o){ if (o.phone) (byPhone[o.phone] = byPhone[o.phone] || []).push(o.no); });
+    state.orders.forEach(function(o){ if (o.phone && !o.server) (byPhone[o.phone] = byPhone[o.phone] || []).push(o.no); });
     var changed = false;
     for (var ph in byPhone) {
       try {
@@ -269,7 +271,7 @@ label{font-size:12px;color:var(--muted);display:block;margin:0 0 4px 2px}
 
   /* ---------- Ko'rinishlar ---------- */
   function renderNav(){
-    var items = [['home','🏠','Bosh sahifa'],['cart','🛒','Savat'],['orders','📦','Buyurtmalar'],['info','ℹ️',"Ma'lumot"]];
+    var items = [['home','🏠','Bosh sahifa'],['cart','🛒','Savat'],['orders','📦','Buyurtmalar'],['profile','👤','Profil'],['info','ℹ️',"Ma'lumot"]];
     $('nav').innerHTML = items.map(function(t){
       var dot = (t[0] === 'cart' && cartCount()) ? '<em class="dot">' + cartCount() + '</em>' : '';
       return '<button data-tab="' + t[0] + '" class="' + (state.tab === t[0] ? 'on' : '') + '">' + dot + '<span>' + t[1] + '</span>' + t[2] + '</button>';
@@ -327,7 +329,8 @@ label{font-size:12px;color:var(--muted);display:block;margin:0 0 4px 2px}
         (groupMode() ? '<span class="tag">' + (i.group ? 'Guruh narxi' : 'Yakka narx') + '</span>' : '') + '<div style="color:var(--gold2);font-weight:700;margin-top:3px">' + money(unit) + '</div></div>' +
         '<div class="qty"><button data-dec="' + idx + '">−</button><b>' + i.qty + '</b><button data-inc="' + idx + '">+</button></div></div>';
     }).join('');
-    var u = load('qs_user', {});
+    var u = state.me ? { name: state.me.name, phone: fmtPhone(state.me.phone), addr: state.me.address } : load('qs_user', {});
+    if (!state.me) return h + '<div class="card" style="padding:16px;margin-top:6px"><b>Buyurtma berish uchun kiring</b><p class="hint" style="margin:6px 0 12px">Telefon raqam va PIN bilan bir daqiqada ro\'yxatdan o\'tasiz. Savatingiz saqlanib turadi.</p><button class="btn" data-tab="profile" data-next="cart">Kirish / Ro\'yxatdan o\'tish</button></div>';
     h += '<div class="total"><span>Jami</span><span>' + money(total) + '</span></div>';
     h += '<p class="hint" style="margin:-6px 0 12px">Yuk (kargo) narxi tovar kelgach, vazniga qarab alohida hisoblanadi.</p>';
     h += '<h2>Buyurtma ma\'lumotlari</h2>' +
@@ -348,6 +351,131 @@ label{font-size:12px;color:var(--muted);display:block;margin:0 0 4px 2px}
     }).join('');
   }
 
+  /* ---------- Hisob (telefon + PIN) ---------- */
+  function fmtPhone(p){ var d = String(p || '').replace(/\D/g, ''); return d.length === 12 ? '+' + d.slice(0, 3) + ' ' + d.slice(3, 5) + ' ' + d.slice(5, 8) + ' ' + d.slice(8, 10) + ' ' + d.slice(10) : String(p || ''); }
+  function clearSession(){
+    state.token = ''; state.me = null; save('qs_token', ''); save('qs_me', null);
+    state.orders = state.orders.filter(function(o){ return !o.server; }); save('qs_orders', state.orders);
+  }
+  function setSession(d){
+    state.token = d.token; state.me = d.profile; save('qs_token', d.token); save('qs_me', d.profile);
+  }
+  async function loadMyOrders(){
+    if (!sb || !state.token) return;
+    try {
+      var r = await sb.rpc('c_orders', { p_token: state.token });
+      if (r.error || !r.data) return;
+      var srv = r.data.map(function(x){
+        state.statuses[x.id] = x.status; state.ship[x.id] = +x.shipping || 0;
+        return { no: x.id, date: new Date(x.created_at).toLocaleString('ru'), items: x.items || [], total: +x.total, phone: state.me ? state.me.phone : '', server: true };
+      });
+      var ids = {}; srv.forEach(function(o){ ids[o.no] = 1; });
+      var local = state.orders.filter(function(o){ return !o.server && !ids[o.no]; });
+      state.orders = local.concat(srv.slice().reverse()); save('qs_orders', state.orders); save('qs_status', state.statuses); save('qs_ship', state.ship);
+      if (state.tab === 'orders') render();
+    } catch(e){}
+  }
+  async function checkSession(){
+    if (!sb || !state.token) return;
+    try {
+      var r = await sb.rpc('c_me', { p_token: state.token });
+      if (r.error) return;
+      if (r.data && r.data.error) { clearSession(); if (state.tab === 'profile' || state.tab === 'cart') render(); return; }
+      if (r.data && r.data.profile) { state.me = r.data.profile; save('qs_me', state.me); }
+      loadMyOrders();
+    } catch(e){}
+  }
+  async function afterAuth(d){
+    setSession(d); toast('Xush kelibsiz, ' + d.profile.name + '!');
+    var next = state.next; state.next = '';
+    state.tab = (next && state.cart.length) ? next : 'profile'; render(); loadMyOrders();
+  }
+  async function busy(id, label, fn){
+    var b = $(id); if (!b) return; var t = b.textContent; b.disabled = true; b.textContent = label;
+    try { await fn(); } catch(e){ toast('Xatolik: ' + (e.message || 'qayta urinib ko\'ring')); }
+    var b2 = $(id); if (b2) { b2.disabled = false; b2.textContent = t; }
+  }
+  function doLogin(){
+    var phone = $('a_phone').value.trim(), pin = $('a_pin').value.trim();
+    if (phone.replace(/\D/g, '').length < 9 || !pin) { toast('Telefon va PIN ni kiriting'); return; }
+    return busy('p_login', 'Kirilmoqda...', async function(){
+      var r = await sb.rpc('c_login', { p_phone: phone, p_pin: pin });
+      if (r.error) { toast('Xatolik: ' + r.error.message); return; }
+      if (r.data.error) { toast(r.data.error); return; }
+      await afterAuth(r.data);
+    });
+  }
+  function doRegister(){
+    var name = $('a_name').value.trim(), phone = $('a_phone').value.trim(), addr = $('a_addr').value.trim(), pin = $('a_pin').value.trim(), pin2 = $('a_pin2').value.trim();
+    if (!name) { toast('Ismingizni kiriting'); return; }
+    if (phone.replace(/\D/g, '').length < 9) { toast('Telefon raqamni to\'g\'ri kiriting'); return; }
+    if (!/^\d{4,6}$/.test(pin)) { toast('PIN 4–6 ta raqamdan iborat bo\'lsin'); return; }
+    if (pin !== pin2) { toast('PIN lar bir xil emas'); return; }
+    return busy('p_reg', 'Yaratilmoqda...', async function(){
+      var r = await sb.rpc('c_register', { p_phone: phone, p_pin: pin, p_name: name, p_address: addr });
+      if (r.error) { toast(r.error.message || 'Xatolik'); return; }
+      await afterAuth(r.data);
+    });
+  }
+  function saveProfile(){
+    var name = $('a_name').value.trim(), addr = $('a_addr').value.trim();
+    if (!name) { toast('Ismingizni kiriting'); return; }
+    return busy('p_save', 'Saqlanmoqda...', async function(){
+      var r = await sb.rpc('c_update', { p_token: state.token, p_name: name, p_address: addr });
+      if (r.error) { toast('Xatolik: ' + r.error.message); return; }
+      if (r.data.error === 'session') { clearSession(); render(); toast('Seans tugagan. Qayta kiring'); return; }
+      if (r.data.error) { toast(r.data.error); return; }
+      state.me = r.data.profile; save('qs_me', state.me); toast('Saqlandi'); render();
+    });
+  }
+  function changePin(){
+    var o = $('a_old').value.trim(), n = $('a_new').value.trim();
+    if (!o || !/^\d{4,6}$/.test(n)) { toast('Eski PIN va yangi PIN (4–6 raqam) ni kiriting'); return; }
+    return busy('p_pin', 'Saqlanmoqda...', async function(){
+      var r = await sb.rpc('c_change_pin', { p_token: state.token, p_old: o, p_new: n });
+      if (r.error) { toast('Xatolik: ' + r.error.message); return; }
+      if (r.data.error === 'session') { clearSession(); render(); toast('Seans tugagan. Qayta kiring'); return; }
+      if (r.data.error) { toast(r.data.error); return; }
+      $('a_old').value = ''; $('a_new').value = ''; toast('PIN o\'zgartirildi');
+    });
+  }
+  async function doLogout(){
+    if (!confirm('Hisobdan chiqasizmi?')) return;
+    var tk = state.token; clearSession(); state.pmode = 'login'; render();
+    try { await sb.rpc('c_logout', { p_token: tk }); } catch(e){}
+  }
+  function renderProfile(){
+    if (!state.me) {
+      var tg = tgName(), reg = state.pmode === 'reg';
+      var h = '<div class="chips" style="margin-bottom:12px"><button class="chip ' + (reg ? '' : 'on') + '" data-pm="login">Kirish</button><button class="chip ' + (reg ? 'on' : '') + '" data-pm="reg">Ro\'yxatdan o\'tish</button></div>';
+      if (reg) {
+        return h + '<label>Ism Familiya</label><input id="a_name" autocomplete="name">' +
+          '<label>Telefon raqam</label><input id="a_phone" type="tel" autocomplete="tel" placeholder="+998">' +
+          '<label>Manzil (viloyat, shahar, ko\'cha) — ixtiyoriy</label><input id="a_addr" autocomplete="street-address">' +
+          '<label>PIN (4–6 ta raqam)</label><input id="a_pin" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password">' +
+          '<label>PIN ni takrorlang</label><input id="a_pin2" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password">' +
+          '<button class="btn" id="p_reg">Ro\'yxatdan o\'tish</button>' +
+          '<p class="hint">PIN ni eslab qoling: u bilan hisobingizga kirasiz.</p>';
+      }
+      return h + '<label>Telefon raqam</label><input id="a_phone" type="tel" autocomplete="tel" placeholder="+998">' +
+        '<label>PIN</label><input id="a_pin" type="password" inputmode="numeric" maxlength="6" autocomplete="current-password">' +
+        '<button class="btn" id="p_login">Kirish</button>' +
+        '<p class="hint">PIN esdan chiqdimi? ' + (tg ? '<a style="color:var(--gold2)" target="_blank" rel="noopener" href="https://t.me/' + encodeURIComponent(tg) + '">Telegramda yozing</a>, yangi PIN beramiz.' : 'Admin bilan bog\'laning, yangi PIN beradi.') + '</p>';
+    }
+    var m = state.me, cnt = state.orders.filter(function(o){ return o.server; }).length;
+    return '<div class="card" style="padding:16px;display:flex;gap:14px;align-items:center;margin-bottom:14px"><div style="width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,var(--gold2),var(--gold));color:#1a1405;display:grid;place-items:center;font-size:22px;font-weight:800">' + esc((m.name || '?').charAt(0).toUpperCase()) + '</div>' +
+      '<div><div style="font-weight:800;font-size:16px">' + esc(m.name) + '</div><div class="muted" style="font-size:13px">' + esc(fmtPhone(m.phone)) + '</div><div class="muted" style="font-size:12px">Buyurtmalar: ' + cnt + '</div></div></div>' +
+      '<h2>Mening ma\'lumotlarim</h2>' +
+      '<label>Ism Familiya</label><input id="a_name" autocomplete="name" value="' + esc(m.name) + '">' +
+      '<label>Manzil</label><input id="a_addr" autocomplete="street-address" value="' + esc(m.address) + '">' +
+      '<div class="muted" style="margin:-4px 0 10px;font-size:12px">Telefon raqamni o\'zgartirish uchun admin bilan bog\'laning.</div>' +
+      '<button class="btn" id="p_save">Saqlash</button>' +
+      '<h2 style="margin-top:22px">PIN ni o\'zgartirish</h2>' +
+      '<label>Eski PIN</label><input id="a_old" type="password" inputmode="numeric" maxlength="6" autocomplete="current-password">' +
+      '<label>Yangi PIN (4–6 ta raqam)</label><input id="a_new" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password">' +
+      '<button class="btn ghost" id="p_pin">PIN ni o\'zgartirish</button>' +
+      '<button class="btn ghost" style="margin-top:22px;color:var(--red)" id="p_logout">Hisobdan chiqish</button>';
+  }
   function renderInfo(){
     var steps = state.info.steps || [];
     var h = '';
@@ -361,7 +489,7 @@ label{font-size:12px;color:var(--muted);display:block;margin:0 0 4px 2px}
 
   function render(){
     var m = $('main');
-    m.innerHTML = state.tab === 'home' ? renderHome() : state.tab === 'cart' ? renderCart() : state.tab === 'orders' ? renderOrders() : renderInfo();
+    m.innerHTML = state.tab === 'home' ? renderHome() : state.tab === 'cart' ? renderCart() : state.tab === 'orders' ? renderOrders() : state.tab === 'profile' ? renderProfile() : renderInfo();
     renderNav();
     window.scrollTo(0, 0);
   }
@@ -423,11 +551,12 @@ label{font-size:12px;color:var(--muted);display:block;margin:0 0 4px 2px}
     var res;
     try {
       res = await sb.rpc('place_order', { p_name: name, p_phone: phone, p_address: addr, p_note: note,
-        p_items: state.cart.map(function(i){ return { id: i.id, qty: i.qty, group: i.group, opt: i.opt || '' }; }) });
+        p_items: state.cart.map(function(i){ return { id: i.id, qty: i.qty, group: i.group, opt: i.opt || '' }; }), p_token: state.token });
     } catch(e){ res = { error: { message: 'Tarmoq xatosi' } }; }
+    if (res.error && /tizimga kiring/.test(res.error.message || '')) { clearSession(); state.tab = 'profile'; render(); toast('Seans tugagan. Qayta kiring'); return; }
     if (res.error) { btn.disabled = false; btn.textContent = 'Buyurtma yuborish'; toast('Xatolik: ' + (res.error.message || 'qayta urinib ko\'ring')); return; }
     var no = res.data;
-    state.orders.push({ no: no, date: new Date().toLocaleString('ru'), items: items, total: total, phone: phone }); save('qs_orders', state.orders);
+    state.orders.push({ no: no, date: new Date().toLocaleString('ru'), items: items, total: total, phone: phone, server: true }); save('qs_orders', state.orders);
     state.cart = []; save('qs_cart', state.cart);
     var msg = '🛍 Buyurtma #' + no + '\n' + items.map(function(i){ return '• ' + i.name + ' × ' + i.qty + (i.group ? ' (guruh)' : ''); }).join('\n') +
       '\nJami: ' + money(total) + '\n👤 ' + name + '\n📞 ' + phone;
@@ -442,9 +571,15 @@ label{font-size:12px;color:var(--muted);display:block;margin:0 0 4px 2px}
   }
 
   document.addEventListener('click', function(e){
-    var t = e.target.closest('[data-tab],[data-cat],[data-open],[data-zoom],#lbx,[data-opt],[data-addg],[data-adds],[data-share],[data-inc],[data-dec],#send,#x,#x2,#bg');
+    var t = e.target.closest('[data-tab],[data-pm],#p_login,#p_reg,#p_save,#p_pin,#p_logout,[data-cat],[data-open],[data-zoom],#lbx,[data-opt],[data-addg],[data-adds],[data-share],[data-inc],[data-dec],#send,#x,#x2,#bg');
     if (!t) return;
-    if (t.dataset.tab) { state.tab = t.dataset.tab; render(); if (state.tab === 'orders') refreshStatuses(); }
+    if (t.dataset.pm) { state.pmode = t.dataset.pm; render(); }
+    else if (t.id === 'p_login') doLogin();
+    else if (t.id === 'p_reg') doRegister();
+    else if (t.id === 'p_save') saveProfile();
+    else if (t.id === 'p_pin') changePin();
+    else if (t.id === 'p_logout') doLogout();
+    else if (t.dataset.tab) { state.next = t.dataset.next || ''; state.tab = t.dataset.tab; render(); if (state.tab === 'orders') refreshStatuses(); }
     else if (t.dataset.cat !== undefined) { state.cat = t.dataset.cat; render(); }
     else if (t.dataset.open) openProduct(+t.dataset.open);
     else if (t.id === 'lbx') closeZoom();
@@ -473,10 +608,12 @@ label{font-size:12px;color:var(--muted);display:block;margin:0 0 4px 2px}
 
   async function init(){
     state.cart = load('qs_cart', []); state.orders = load('qs_orders', []); state.statuses = load('qs_status', {}); state.ship = load('qs_ship', {});
+    state.token = load('qs_token', ''); state.me = state.token ? load('qs_me', null) : null; state.pmode = 'login';
     var ok = await loadData();
     if (!ok) { $('main').innerHTML = '<div class="empty"><b>📡</b>Mahsulotlar yuklanmadi.<br>Internetni tekshirib, qayta urinib ko\'ring.</div>'; renderNav(); }
     else {
       render();
+      checkSession();
       refreshStatuses();
       var q = new URLSearchParams(location.search).get('p');
       if (q) openProduct(+q);

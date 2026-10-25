@@ -124,6 +124,17 @@ label{font-size:12px;color:var(--muted);display:block;margin:0 0 4px 2px}
   function byId(id){ return state.products.filter(function(p){ return p.id === id; })[0]; }
   function discount(p){ return p.oldPrice > p.price ? Math.round((1 - p.price / p.oldPrice) * 100) : 0; }
   function soloPrice(p){ return p.oldPrice > 0 ? p.oldPrice : p.price; }
+  function groupMode(){ return state.shop.group_mode !== false; }
+  // Guruh rejimi o'chiq bo'lsa hamma narsa bitta narxda (p.price). Yoqiq bo'lsa: guruh = price, yakka = oldPrice.
+  function unitPrice(p, group){ return (groupMode() && !group) ? soloPrice(p) : p.price; }
+  function normalizeCart(){
+    var m = {}, out = [];
+    state.cart.forEach(function(i){
+      if (m[i.id]) m[i.id].qty += i.qty;
+      else { m[i.id] = { id: i.id, group: false, qty: i.qty }; out.push(m[i.id]); }
+    });
+    state.cart = out; save('qs_cart', out);
+  }
   function toast(t){ var el = $('toast'); el.textContent = t; el.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(function(){ el.classList.remove('show'); }, 2600); }
   function pic(p){ return p.img ? '<img src="' + esc(p.img) + '" alt="" loading="lazy">' : esc(p.emoji || '📦'); }
   function cartCount(){ return state.cart.reduce(function(s, i){ return s + i.qty; }, 0); }
@@ -151,6 +162,7 @@ label{font-size:12px;color:var(--muted);display:block;margin:0 0 4px 2px}
     state.shop = Object.assign({}, DEFAULT_SHOP, shop);
     state.info = Object.assign({}, DEFAULT_INFO, info);
     state.cart = state.cart.filter(function(i){ return byId(i.id); });
+    if (!groupMode()) normalizeCart();
     $('brand').innerHTML = brandHtml(state.shop.name);
     $('tagline').textContent = state.shop.tagline || '';
     document.title = state.shop.name || 'qSHOP';
@@ -188,14 +200,15 @@ label{font-size:12px;color:var(--muted);display:block;margin:0 0 4px 2px}
     var s = state.shop;
     var h = '<div class="hero"><b>' + esc(s.hero_title) + '</b><p>' + esc(s.hero_text) + '</p></div>';
     if (!state.products.length) return h + '<div class="empty"><b>🛍</b>Hozircha mahsulot yo\'q.<br>Tez orada yangilari qo\'shiladi.</div>';
-    h += '<h2>🔥 Bugungi guruhlar</h2><div class="grid">';
+    h += '<h2>' + (groupMode() ? '🔥 Bugungi guruhlar' : '🛍 Mahsulotlar') + '</h2><div class="grid">';
     h += state.products.map(function(p){
       var pct = Math.min(100, Math.round(p.joined / p.groupSize * 100));
       return '<div class="card" data-open="' + p.id + '"><div class="pic">' + pic(p) + (discount(p) ? '<span class="badge">-' + discount(p) + '%</span>' : '') + '</div>' +
         '<div class="info"><div class="name">' + esc(p.name) + '</div>' +
         '<div class="price">' + money(p.price) + (p.oldPrice > p.price ? '<span class="old">' + money(p.oldPrice) + '</span>' : '') + '</div>' +
-        '<div class="bar"><i style="width:' + pct + '%"></i></div>' +
-        '<div class="meta"><span>' + Math.min(p.joined, p.groupSize) + '/' + p.groupSize + ' kishi</span><span>' + timeLabel(p) + '</span></div></div></div>';
+        (groupMode() ? '<div class="bar"><i style="width:' + pct + '%"></i></div>' +
+        '<div class="meta"><span>' + Math.min(p.joined, p.groupSize) + '/' + p.groupSize + ' kishi</span><span>' + timeLabel(p) + '</span></div>' : '') +
+        '</div></div>';
     }).join('');
     return h + '</div>';
   }
@@ -205,10 +218,10 @@ label{font-size:12px;color:var(--muted);display:block;margin:0 0 4px 2px}
     var total = 0;
     var h = state.cart.map(function(i, idx){
       var p = byId(i.id); if (!p) return '';
-      var unit = i.group ? p.price : soloPrice(p);
+      var unit = unitPrice(p, i.group);
       total += unit * i.qty;
       return '<div class="cartrow"><div class="th">' + pic(p) + '</div><div class="c"><div>' + esc(p.name) + '</div>' +
-        '<span class="tag">' + (i.group ? 'Guruh narxi' : 'Yakka narx') + '</span><div style="color:var(--gold2);font-weight:700;margin-top:3px">' + money(unit) + '</div></div>' +
+        (groupMode() ? '<span class="tag">' + (i.group ? 'Guruh narxi' : 'Yakka narx') + '</span>' : '') + '<div style="color:var(--gold2);font-weight:700;margin-top:3px">' + money(unit) + '</div></div>' +
         '<div class="qty"><button data-dec="' + idx + '">−</button><b>' + i.qty + '</b><button data-inc="' + idx + '">+</button></div></div>';
     }).join('');
     var u = load('qs_user', {});
@@ -256,11 +269,13 @@ label{font-size:12px;color:var(--muted);display:block;margin:0 0 4px 2px}
     $('sheet').innerHTML = '<button class="close" id="x">✕</button><div class="pic">' + pic(p) + '</div><div class="body">' +
       '<div style="font-size:17px;font-weight:700;line-height:1.3">' + esc(p.name) + '</div>' +
       '<div class="price" style="font-size:22px;margin-top:8px">' + money(p.price) + (p.oldPrice > p.price ? '<span class="old">' + money(p.oldPrice) + '</span>' : '') + '</div>' +
-      '<div class="bar" style="margin-top:12px"><i style="width:' + Math.min(100, Math.round(p.joined / p.groupSize * 100)) + '%"></i></div>' +
-      '<div class="meta" style="margin-top:6px"><span>' + (left ? "Guruh to'lishi uchun yana " + left + ' kishi kerak' : "Guruh to'ldi!") + '</span><span>' + timeLabel(p) + '</span></div>' +
+      (groupMode() ? '<div class="bar" style="margin-top:12px"><i style="width:' + Math.min(100, Math.round(p.joined / p.groupSize * 100)) + '%"></i></div>' +
+      '<div class="meta" style="margin-top:6px"><span>' + (left ? "Guruh to'lishi uchun yana " + left + ' kishi kerak' : "Guruh to'ldi!") + '</span><span>' + timeLabel(p) + '</span></div>' : '') +
       '<p class="hint" style="color:#cfc9b3;font-size:13px">' + esc(p.desc) + '</p>' +
-      '<div class="row"><button class="btn" data-addg="' + p.id + '">Guruhga qo\'shilish<br><small>' + money(p.price) + '</small></button>' +
-      '<button class="btn ghost" data-adds="' + p.id + '">Yakka olish<br><small>' + money(soloPrice(p)) + '</small></button></div>' +
+      (groupMode()
+        ? '<div class="row"><button class="btn" data-addg="' + p.id + '">Guruhga qo\'shilish<br><small>' + money(p.price) + '</small></button>' +
+          '<button class="btn ghost" data-adds="' + p.id + '">Yakka olish<br><small>' + money(soloPrice(p)) + '</small></button></div>'
+        : '<div class="row"><button class="btn" data-adds="' + p.id + '">Savatga qo\'shish<br><small>' + money(p.price) + '</small></button></div>') +
       '<button class="btn ghost" style="margin-top:10px" data-share="' + p.id + '">📤 Do\'stlarga ulashish</button></div>';
     $('bg').classList.add('show'); $('sheet').classList.add('show');
   }
@@ -275,7 +290,7 @@ label{font-size:12px;color:var(--muted);display:block;margin:0 0 4px 2px}
   function share(id){
     var p = byId(id); if (!p) return;
     var url = location.href.split('?')[0].split('#')[0] + '?p=' + p.id;
-    var text = (state.shop.name || 'qSHOP') + ': ' + p.name + ' — guruh narxi ' + money(p.price) + '. Birga olamiz!';
+    var text = (state.shop.name || 'qSHOP') + ': ' + p.name + (groupMode() ? ' — guruh narxi ' + money(p.price) + '. Birga olamiz!' : ' — ' + money(p.price));
     if (navigator.share) { navigator.share({ title: state.shop.name || 'qSHOP', text: text, url: url }).catch(function(){}); }
     else { window.open('https://t.me/share/url?url=' + encodeURIComponent(url) + '&text=' + encodeURIComponent(text), '_blank'); }
   }
@@ -288,7 +303,7 @@ label{font-size:12px;color:var(--muted);display:block;margin:0 0 4px 2px}
     save('qs_user', { name: name, phone: phone, addr: addr });
     var total = 0;
     var items = state.cart.map(function(i){
-      var p = byId(i.id); var unit = i.group ? p.price : soloPrice(p); total += unit * i.qty;
+      var p = byId(i.id); var unit = unitPrice(p, i.group); total += unit * i.qty;
       return { id: p.id, name: p.name, qty: i.qty, group: i.group, unit: unit };
     });
     var res;

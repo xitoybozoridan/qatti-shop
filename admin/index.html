@@ -90,6 +90,7 @@ a{color:var(--gold2)}
   function toast(t){ var el = $('toast'); el.textContent = t; el.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(function(){ el.classList.remove('show'); }, 2600); }
   function fmtDate(iso){ try { return new Date(iso).toLocaleString('ru', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); } catch(e){ return ''; } }
   function hoursLeft(iso){ return iso ? Math.ceil((new Date(iso).getTime() - Date.now()) / 3600000) : null; }
+  function gm(){ return S.shop.group_mode !== false; }
   function phoneDigits(p){ var d = String(p || '').replace(/\D/g, ''); if (d.length === 9) d = '998' + d; return d; }
   function errMsg(e){ return (e && e.message) ? e.message : 'Noma\'lum xatolik'; }
 
@@ -216,7 +217,10 @@ a{color:var(--gold2)}
       var hl = hoursLeft(p.ends_at);
       return '<div class="card"><div class="row" data-edit="' + p.id + '" style="cursor:pointer">' + thumb(p) +
         '<div style="flex:1;min-width:0"><div style="font-weight:700;font-size:14px">' + esc(p.name) + (p.active ? '' : ' <span class="pill" style="color:#9a978c">yashirin</span>') + '</div>' +
-        '<div class="muted">' + money(p.price) + (p.old_price > 0 ? ' · yakka ' + money(p.old_price) : '') + '<br>Guruh: ' + p.joined + '/' + p.group_size + (hl === null ? '' : ' · ' + (hl <= 0 ? 'muddat tugagan' : hl + ' soat')) + '</div></div><span class="muted">✏️</span></div></div>';
+        '<div class="muted">' + (gm()
+          ? money(p.price) + (p.old_price > 0 ? ' · yakka ' + money(p.old_price) : '') + '<br>Guruh: ' + p.joined + '/' + p.group_size + (hl === null ? '' : ' · ' + (hl <= 0 ? 'muddat tugagan' : hl + ' soat'))
+          : money(p.price) + (p.old_price > p.price ? ' · eski narx ' + money(p.old_price) : '')) +
+        '</div></div><span class="muted">✏️</span></div></div>';
     }).join('');
   }
   function openEdit(id){
@@ -225,16 +229,17 @@ a{color:var(--gold2)}
     S.editing = p;
     var hl = p.ends_at ? Math.max(0, hoursLeft(p.ends_at)) : '';
     S.editing._hl0 = String(hl);
+    var hide = gm() ? '' : ' style="display:none"';
     $('modal').innerHTML = '<div class="in"><div class="row sp" style="margin-bottom:10px"><h2 style="margin:0">' + (p.id ? 'Mahsulotni tahrirlash' : 'Yangi mahsulot') + '</h2><button class="btn small ghost" data-closemodal="1">✕</button></div>' +
       '<div id="pf_pic" class="row" style="margin-bottom:10px">' + picBlock(p) + '</div>' +
       '<input type="file" id="pf_file" accept="image/*" style="display:none">' +
       '<label>Nomi</label><input id="pf_name" value="' + esc(p.name) + '">' +
       '<label>Tavsif</label><textarea id="pf_desc" rows="3">' + esc(p.description) + '</textarea>' +
-      '<div class="grid2"><div><label>Guruh narxi (so\'m)</label><input id="pf_price" type="number" inputmode="numeric" value="' + esc(p.price) + '"></div>' +
-      '<div><label>Yakka narx (so\'m)</label><input id="pf_old" type="number" inputmode="numeric" value="' + esc(p.old_price) + '"></div>' +
-      '<div><label>Guruh hajmi (kishi)</label><input id="pf_gs" type="number" inputmode="numeric" value="' + esc(p.group_size) + '"></div>' +
-      '<div><label>Hozir qo\'shilgan</label><input id="pf_joined" type="number" inputmode="numeric" value="' + esc(p.joined) + '"></div>' +
-      '<div><label>Muddat (necha soat qoldi)</label><input id="pf_hours" type="number" inputmode="numeric" placeholder="bo\'sh = cheksiz" value="' + esc(hl) + '"></div>' +
+      '<div class="grid2"><div><label>' + (gm() ? "Guruh narxi (so'm)" : "Narx (so'm)") + '</label><input id="pf_price" type="number" inputmode="numeric" value="' + esc(p.price) + '"></div>' +
+      '<div><label>' + (gm() ? "Yakka narx (so'm)" : "Eski narx (ustiga chiziladi, ixtiyoriy)") + '</label><input id="pf_old" type="number" inputmode="numeric" value="' + esc(p.old_price) + '"></div>' +
+      '<div' + hide + '><label>Guruh hajmi (kishi)</label><input id="pf_gs" type="number" inputmode="numeric" value="' + esc(p.group_size) + '"></div>' +
+      '<div' + hide + '><label>Hozir qo\'shilgan</label><input id="pf_joined" type="number" inputmode="numeric" value="' + esc(p.joined) + '"></div>' +
+      '<div' + hide + '><label>Muddat (necha soat qoldi)</label><input id="pf_hours" type="number" inputmode="numeric" placeholder="bo\'sh = cheksiz" value="' + esc(hl) + '"></div>' +
       '<div><label>Tartib raqami</label><input id="pf_sort" type="number" inputmode="numeric" value="' + esc(p.sort) + '"></div></div>' +
       '<label>Emoji (rasm bo\'lmasa ko\'rinadi)</label><input id="pf_emoji" value="' + esc(p.emoji) + '">' +
       '<label style="margin:6px 0 14px;font-size:14px;color:var(--text)"><input type="checkbox" id="pf_active"' + (p.active ? ' checked' : '') + '> Mijozlarga ko\'rinsin</label>' +
@@ -303,13 +308,15 @@ a{color:var(--gold2)}
       '<label>Katta banner sarlavhasi</label><input id="tx_ht" value="' + esc(sh.hero_title) + '">' +
       '<label>Banner matni</label><textarea id="tx_hx" rows="3">' + esc(sh.hero_text) + '</textarea>' +
       '<label>Sizning Telegram username (@siz)</label><input id="tx_tg" value="' + esc(sh.admin_telegram) + '" placeholder="@username">' +
+      '<label style="margin:6px 0 4px;font-size:14px;color:var(--text)"><input type="checkbox" id="tx_gm"' + (gm() ? ' checked' : '') + '> Guruh rejimi</label>' +
+      '<div class="muted" style="margin-bottom:14px">' + "O'chirilsa: ilova oddiy do'kon bo'ladi, mahsulotda bitta narx ko'rinadi, guruhga qo'shilish tugmasi yo'qoladi. Banner va «Ma'lumot» matnlarini ham mosiga o'zgartiring." + '</div>' +
       '<h2>"Ma\'lumot" bo\'limi</h2>' +
       '<label>Qadamlar (har bir qator — bitta qadam)</label><textarea id="tx_steps" rows="7">' + esc((inf.steps || []).join('\n')) + '</textarea>' +
       '<label>Muhim eslatma</label><textarea id="tx_note" rows="4">' + esc(inf.note) + '</textarea>' +
       '<button class="btn" id="tx_save">Saqlash</button>';
   }
   async function saveTexts(){
-    var shop = { name: $('tx_name').value.trim() || 'qSHOP', tagline: $('tx_tag').value.trim(), hero_title: $('tx_ht').value.trim(), hero_text: $('tx_hx').value.trim(), admin_telegram: $('tx_tg').value.trim() };
+    var shop = { name: $('tx_name').value.trim() || 'qSHOP', tagline: $('tx_tag').value.trim(), hero_title: $('tx_ht').value.trim(), hero_text: $('tx_hx').value.trim(), admin_telegram: $('tx_tg').value.trim(), group_mode: $('tx_gm').checked };
     var info = { steps: $('tx_steps').value.split('\n').map(function(s){ return s.trim(); }).filter(Boolean), note: $('tx_note').value.trim() };
     var now = new Date().toISOString();
     var r = await sb.from('settings').upsert([{ key: 'shop', value: shop, updated_at: now }, { key: 'info', value: info, updated_at: now }]);

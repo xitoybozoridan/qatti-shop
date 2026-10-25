@@ -182,7 +182,9 @@ a{color:var(--gold2)}
           return '<div class="ord item">' + kv('Mahsulot', sp.name) + sp.opts.map(function(x){ var k = x.indexOf(':'); return kv(x.slice(0, k), x.slice(k + 1).trim()); }).join('') +
             kv('Soni', i.qty + ' dona' + (i.group ? ' (guruh)' : '')) + kv('Narxi', money(i.unit * i.qty)) + '</div>';
         }).join('') +
-        '<div class="row sp" style="margin-bottom:10px"><span class="muted">Jami</span><b style="color:var(--gold2)">' + money(o.total) + '</b></div>' +
+        '<div class="row sp"><span class="muted">Tovarlar</span><b>' + money(o.total) + '</b></div>' +
+        '<label>Yuk (kargo) narxi, so\'m — mijoz ko\'radi</label><input type="number" inputmode="numeric" data-ship="' + o.id + '" value="' + esc(+o.shipping || '') + '" placeholder="Masalan: 25000">' +
+        '<div class="row sp" style="margin-bottom:10px"><span class="muted">To\'lov jami</span><b style="color:var(--gold2)">' + money((+o.total || 0) + (+o.shipping || 0)) + '</b></div>' +
         '<label>Holat</label><select data-status="' + o.id + '">' + Object.keys(STATUS).map(function(k){ return '<option value="' + k + '"' + (k === o.status ? ' selected' : '') + '>' + STATUS[k][0] + '</option>'; }).join('') + '</select>' +
         '<label>Izoh (faqat sizga ko\'rinadi)</label><input data-anote="' + o.id + '" value="' + esc(o.admin_note) + '" placeholder="Masalan: yuan kursi 1750">' +
         '<div class="row" style="flex-wrap:wrap"><a class="btn small ghost" href="tel:+' + d + '">📞 Qo\'ng\'iroq</a><a class="btn small ghost" target="_blank" rel="noopener" href="https://t.me/+' + d + '">✈️ Telegram</a>' +
@@ -206,6 +208,13 @@ a{color:var(--gold2)}
       }
     }
     toast('Holat yangilandi'); render();
+  }
+  async function saveShipping(id, val){
+    var n = Math.max(0, parseFloat(val) || 0);
+    var r = await sb.from('orders').update({ shipping: n }).eq('id', id);
+    if (r.error) { toast('Xatolik: ' + errMsg(r.error)); return; }
+    var o = S.orders.filter(function(x){ return x.id === id; })[0]; if (o) o.shipping = n;
+    toast('Yuk narxi saqlandi'); render();
   }
   async function saveAdminNote(id, val){
     var r = await sb.from('orders').update({ admin_note: val }).eq('id', id);
@@ -494,6 +503,7 @@ a{color:var(--gold2)}
   document.addEventListener('change', function(e){
     var t = e.target;
     if (t.dataset && t.dataset.status) return setStatus(+t.dataset.status, t.value);
+    if (t.dataset && t.dataset.ship) return saveShipping(+t.dataset.ship, t.value);
     if (t.dataset && t.dataset.anote) return saveAdminNote(+t.dataset.anote, t.value.trim());
     if (t.id === 'pf_file' && t.files && t.files[0]) { uploadImage(t.files[0]); t.value = ''; }
     if (t.id === 'pf_file2' && t.files && t.files.length) { uploadGallery(Array.prototype.slice.call(t.files)); t.value = ''; }

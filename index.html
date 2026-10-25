@@ -74,6 +74,11 @@ input[type=search]{-webkit-appearance:none;appearance:none}
 .lb::-webkit-scrollbar{display:none}
 .lb .s{flex:none;width:100%;height:100%;scroll-snap-align:center;display:grid;place-items:center}
 .lb img{max-width:100%;max-height:100%;object-fit:contain}
+.paybox{padding:14px;margin:10px 0 14px}
+.cardno{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--card2);border:1px dashed var(--gold);border-radius:12px;padding:12px;margin:10px 0}
+.cardno b{font-size:15px;letter-spacing:.3px;white-space:nowrap;color:var(--gold2)}
+.rc{width:64px;height:64px;border-radius:10px;object-fit:cover;border:1px solid var(--line);cursor:pointer;background:var(--card2)}
+.lbd{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:90;background:var(--gold);color:#1a1405;border:0;border-radius:24px;padding:12px 22px;font-size:15px;font-weight:700;font-family:inherit}
 .lbx{position:fixed;top:14px;right:14px;z-index:90;width:44px;height:44px;border-radius:50%;background:rgba(40,40,40,.85);color:#fff;border:0;font-size:20px}
 .dots{display:flex;justify-content:center;gap:6px;margin-top:8px}
 .dots i{width:7px;height:7px;border-radius:50%;background:#444}
@@ -131,7 +136,7 @@ label{font-size:12px;color:var(--muted);display:block;margin:0 0 4px 2px}
   var DEFAULT_SHOP = { name: 'qSHOP', tagline: 'Xitoy tovarlari, guruh bilan arzon', hero_title: "Do'stlar bilan olsangiz — arzonroq",
     hero_text: "Mahsulotni tanlang, guruhga qo'shiling va do'stlaringizni chaqiring. Guruh to'lgach buyurtma Xitoydan yo'lga chiqadi.", admin_telegram: '' };
   var DEFAULT_INFO = { steps: [], note: '' };
-  var state = { products: [], shop: DEFAULT_SHOP, info: DEFAULT_INFO, categories: [], cat: '', q: '', tab: 'home', cart: [], orders: [], loaded: false };
+  var state = { products: [], shop: DEFAULT_SHOP, info: DEFAULT_INFO, categories: [], pay: {}, rcpt: null, cat: '', q: '', tab: 'home', cart: [], orders: [], loaded: false };
   var sb = null;
   try { if (window.supabase && window.QSHOP && QSHOP.SUPABASE_URL) sb = window.supabase.createClient(QSHOP.SUPABASE_URL, QSHOP.SUPABASE_KEY); } catch(e){}
 
@@ -189,7 +194,7 @@ label{font-size:12px;color:var(--muted);display:block;margin:0 0 4px 2px}
     var imgs = [];
     if (p.img) imgs.push(p.img);
     (p.images || []).forEach(function(u){ if (u && imgs.indexOf(u) < 0) imgs.push(u); });
-    state.gal = imgs;
+    state.gal = imgs; state.galName = p.name;
     if (imgs.length < 2) return '<div class="pic"' + (imgs.length ? ' data-zoom="0"' : '') + '>' + pic(p) + '</div>';
     return '<div class="gal" id="gal">' + imgs.map(function(u, i){ return '<div class="slide" data-zoom="' + i + '"><img src="' + esc(u) + '" alt=""></div>'; }).join('') + '</div>' +
       '<div class="dots" id="dots">' + imgs.map(function(u, i){ return '<i class="' + (i === 0 ? 'on' : '') + '"></i>'; }).join('') + '</div>';
@@ -233,15 +238,16 @@ label{font-size:12px;color:var(--muted);display:block;margin:0 0 4px 2px}
   }
   function applyData(d){
     state.products = (d.products || []).map(mapRow);
-    var shop = {}; var info = {}; var cats = [];
+    var shop = {}; var info = {}; var cats = []; var pay = {};
     (d.settings || []).forEach(function(s){
       if (s.key === 'shop') shop = s.value || {};
       if (s.key === 'info') info = s.value || {};
       if (s.key === 'categories') cats = (s.value && s.value.list) || [];
+      if (s.key === 'pay') pay = s.value || {};
     });
     state.shop = Object.assign({}, DEFAULT_SHOP, shop);
     state.info = Object.assign({}, DEFAULT_INFO, info);
-    state.categories = cats;
+    state.categories = cats; state.pay = pay;
     if (state.cat && cats.indexOf(state.cat) < 0) state.cat = '';
     state.cart = state.cart.filter(function(i){ return byId(i.id); });
     if (!groupMode()) normalizeCart();
@@ -338,16 +344,39 @@ label{font-size:12px;color:var(--muted);display:block;margin:0 0 4px 2px}
       '<label>Telefon raqam</label><input id="f_phone" type="tel" autocomplete="tel" placeholder="+998" value="' + esc(u.phone) + '">' +
       '<label>Manzil (viloyat, shahar, ko\'cha)</label><input id="f_addr" autocomplete="street-address" value="' + esc(u.addr) + '">' +
       '<label>Izoh (rang, o\'lcham...)</label><textarea id="f_note" rows="2"></textarea>' +
+      payBoxHtml(total) +
       '<button class="btn" id="send">Buyurtma yuborish</button>';
     return h;
   }
 
+  function fmtCard(c){ var d = String(c || '').replace(/\s+/g, ''); return /^\d{12,19}$/.test(d) ? d.replace(/(.{4})/g, '$1 ').trim() : String(c || ''); }
+  function payReq(){ return !!state.pay.card && state.pay.required !== false; }
+  function rcptBoxHtml(){
+    if (state.rcpt) return '<div class="row" style="gap:12px;align-items:center"><img class="rc" data-rview="1" src="' + esc(state.rcpt.thumb) + '" alt="chek"><div><div style="font-weight:700;font-size:14px">✅ Chek yuklandi</div><div class="muted" style="font-size:12px">Kattalashtirish uchun rasmni bosing</div>' +
+      '<button class="btn small ghost" style="margin-top:6px" data-rmrc="1">Olib tashlash</button></div></div>';
+    return '<label class="btn ghost" for="rc_file" style="display:block;text-align:center;margin-top:4px">📷 To\'lov chekini yuklash' + (payReq() ? ' *' : '') + '</label>';
+  }
+  function payBoxHtml(total){
+    var pc = state.pay; if (!pc.card) return '';
+    return '<div class="card paybox"><b>💳 To\'lov</b>' +
+      '<p class="hint" style="margin:6px 0 0">1) Quyidagi kartaga <b>' + money(total) + '</b> o\'tkazing.<br>2) To\'lov chekini (skrinshot) yuklang.</p>' +
+      '<div class="cardno"><b>' + esc(fmtCard(pc.card)) + '</b><button class="btn small ghost" data-copy="' + esc(String(pc.card).replace(/\s+/g, '')) + '">Nusxalash</button></div>' +
+      (pc.holder ? '<div class="muted" style="margin-bottom:6px">👤 ' + esc(pc.holder) + '</div>' : '') +
+      (pc.note ? '<div class="muted" style="margin-bottom:8px;font-size:12px">' + esc(pc.note) + '</div>' : '') +
+      '<input type="file" id="rc_file" accept="image/*" style="display:none"><div id="rcpt_box">' + rcptBoxHtml() + '</div></div>';
+  }
+  function orderPayHtml(o){
+    if (o.paid) return '<div style="margin-top:6px;color:#6fcf97">✅ To\'lov qabul qilindi</div>';
+    if (o.thumb) return '<div class="row" style="gap:10px;align-items:center;margin-top:8px"><img class="rc" data-rord="' + esc(o.no) + '" src="' + esc(o.thumb) + '" alt="chek"><div class="muted">⏳ Chek tekshirilmoqda</div></div>';
+    if (o.server && state.pay.card) return '<button class="btn small ghost" style="margin-top:8px" data-attach="' + esc(o.no) + '">📷 Chek yuborish</button>';
+    return '';
+  }
   function renderOrders(){
     if (!state.orders.length) return '<div class="empty"><b>📦</b>Hali buyurtma yo\'q.</div>';
-    return state.orders.slice().reverse().map(function(o){
+    return '<input type="file" id="rc_late" accept="image/*" style="display:none">' + state.orders.slice().reverse().map(function(o){
       return '<div class="order"><b>#' + esc(o.no) + '</b> · ' + esc(o.date) + '<br>' +
         o.items.map(function(i){ var sp = splitOpt(i.name); return '<div style="margin-bottom:6px"><b>' + esc(sp.name) + '</b> × ' + i.qty + (i.group ? ' (guruh)' : '') + sp.opts.map(function(x){ return '<div class="muted" style="margin-left:10px">' + esc(x) + '</div>'; }).join('') + '</div>'; }).join('') +
-        '<br>Tovarlar: <b>' + money(o.total) + '</b><br>' + shipHtml(o) + statusHtml(o.no) + '</div>';
+        '<br>Tovarlar: <b>' + money(o.total) + '</b><br>' + shipHtml(o) + statusHtml(o.no) + orderPayHtml(o) + '</div>';
     }).join('');
   }
 
@@ -367,7 +396,7 @@ label{font-size:12px;color:var(--muted);display:block;margin:0 0 4px 2px}
       if (r.error || !r.data) return;
       var srv = r.data.map(function(x){
         state.statuses[x.id] = x.status; state.ship[x.id] = +x.shipping || 0;
-        return { no: x.id, date: new Date(x.created_at).toLocaleString('ru'), items: x.items || [], total: +x.total, phone: state.me ? state.me.phone : '', server: true };
+        return { no: x.id, date: new Date(x.created_at).toLocaleString('ru'), items: x.items || [], total: +x.total, phone: state.me ? state.me.phone : '', server: true, thumb: x.receipt_thumb || '', paid: !!x.paid };
       });
       var ids = {}; srv.forEach(function(o){ ids[o.no] = 1; });
       var local = state.orders.filter(function(o){ return !o.server && !ids[o.no]; });
@@ -507,19 +536,32 @@ label{font-size:12px;color:var(--muted);display:block;margin:0 0 4px 2px}
         ? '<div class="row"><button class="btn" data-addg="' + p.id + '">Guruhga qo\'shilish<br><small>' + money(p.price) + '</small></button>' +
           '<button class="btn ghost" data-adds="' + p.id + '">Yakka olish<br><small>' + money(soloPrice(p)) + '</small></button></div>'
         : '<div class="row"><button class="btn" data-adds="' + p.id + '">Savatga qo\'shish<br><small>' + money(p.price) + '</small></button></div>') +
-      '<button class="btn ghost" style="margin-top:10px" data-share="' + p.id + '">📤 Do\'stlarga ulashish</button></div>';
+      '<button class="btn ghost" style="margin-top:10px" data-share="' + p.id + '">📤 Do\'stlarga ulashish</button>' +
+      ((p.img || (p.images || []).length) ? '<button class="btn ghost" style="margin-top:10px" data-dlall="1">⬇ Rasmlarni yuklab olish</button>' : '') + '</div>';
     $('bg').classList.add('show'); $('sheet').classList.add('show');
   }
-  function openZoom(i){
-    var imgs = state.gal || []; if (!imgs.length) return;
+  function openZoom(i){ showImgs(state.gal || [], i, true); }
+  function showImgs(imgs, i, dl){
+    if (!imgs.length) return;
     closeZoom();
     var d = document.createElement('div'); d.className = 'lb'; d.id = 'lb';
     d.innerHTML = imgs.map(function(u){ return '<div class="s"><img src="' + esc(u) + '" alt=""></div>'; }).join('');
     var x = document.createElement('button'); x.className = 'lbx'; x.id = 'lbx'; x.textContent = '✕';
     document.body.appendChild(d); document.body.appendChild(x);
+    if (dl) { var b = document.createElement('button'); b.className = 'lbd'; b.id = 'lbd'; b.textContent = '⬇ Yuklab olish'; document.body.appendChild(b); }
     d.scrollLeft = i * d.clientWidth;
   }
-  function closeZoom(){ ['lb', 'lbx'].forEach(function(id){ var e = $(id); if (e) e.remove(); }); }
+  async function downloadImg(url, name){
+    try {
+      var r = await fetch(url, { mode: 'cors' }); if (!r.ok) throw new Error('x');
+      var blob = await r.blob(), a = document.createElement('a');
+      a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click();
+      setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 4000);
+      return true;
+    } catch(e){ window.open(url, '_blank'); return false; }
+  }
+  function imgName(i){ return (String(state.galName || 'rasm').replace(/[^\w\u0400-\u04FF]+/g, '_').slice(0, 40) || 'rasm') + '-' + (i + 1) + '.jpg'; }
+  function closeZoom(){ ['lb', 'lbx', 'lbd'].forEach(function(id){ var e = $(id); if (e) e.remove(); }); }
   function closeSheet(){ closeZoom(); $('bg').classList.remove('show'); $('sheet').classList.remove('show'); }
 
   function addToCart(id, group, opt){
@@ -541,6 +583,7 @@ label{font-size:12px;color:var(--muted);display:block;margin:0 0 4px 2px}
     var name = $('f_name').value.trim(), phone = $('f_phone').value.trim(), addr = $('f_addr').value.trim(), note = $('f_note').value.trim();
     if (!name || phone.replace(/\D/g, '').length < 9 || !addr) { toast("Ism, telefon va manzilni to'ldiring"); return; }
     if (!sb) { toast("Internetga ulanib bo'lmadi. Keyinroq urinib ko'ring"); return; }
+    if (payReq() && !state.rcpt) { toast("Avval to'lov chekini yuklang"); return; }
     var btn = $('send'); btn.disabled = true; btn.textContent = 'Yuborilmoqda...';
     save('qs_user', { name: name, phone: phone, addr: addr });
     var total = 0;
@@ -551,12 +594,12 @@ label{font-size:12px;color:var(--muted);display:block;margin:0 0 4px 2px}
     var res;
     try {
       res = await sb.rpc('place_order', { p_name: name, p_phone: phone, p_address: addr, p_note: note,
-        p_items: state.cart.map(function(i){ return { id: i.id, qty: i.qty, group: i.group, opt: i.opt || '' }; }), p_token: state.token });
+        p_items: state.cart.map(function(i){ return { id: i.id, qty: i.qty, group: i.group, opt: i.opt || '' }; }), p_token: state.token, p_receipt: state.rcpt ? state.rcpt.full : null, p_thumb: state.rcpt ? state.rcpt.thumb : null });
     } catch(e){ res = { error: { message: 'Tarmoq xatosi' } }; }
     if (res.error && /tizimga kiring/.test(res.error.message || '')) { clearSession(); state.tab = 'profile'; render(); toast('Seans tugagan. Qayta kiring'); return; }
     if (res.error) { btn.disabled = false; btn.textContent = 'Buyurtma yuborish'; toast('Xatolik: ' + (res.error.message || 'qayta urinib ko\'ring')); return; }
     var no = res.data;
-    state.orders.push({ no: no, date: new Date().toLocaleString('ru'), items: items, total: total, phone: phone, server: true }); save('qs_orders', state.orders);
+    state.orders.push({ no: no, date: new Date().toLocaleString('ru'), items: items, total: total, phone: phone, server: true, thumb: state.rcpt ? state.rcpt.thumb : '', paid: false }); state.rcpt = null; save('qs_orders', state.orders);
     state.cart = []; save('qs_cart', state.cart);
     var msg = '🛍 Buyurtma #' + no + '\n' + items.map(function(i){ return '• ' + i.name + ' × ' + i.qty + (i.group ? ' (guruh)' : ''); }).join('\n') +
       '\nJami: ' + money(total) + '\n👤 ' + name + '\n📞 ' + phone;
@@ -594,6 +637,57 @@ label{font-size:12px;color:var(--muted);display:block;margin:0 0 4px 2px}
     else if (t.id === 'x' || t.id === 'x2' || t.id === 'bg') closeSheet();
   });
 
+  function makeJpeg(file, maxSide, q){
+    return new Promise(function(resolve, reject){
+      var url = URL.createObjectURL(file), img = new Image();
+      img.onload = function(){
+        var k = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+        var c = document.createElement('canvas'); c.width = Math.max(1, Math.round(img.naturalWidth * k)); c.height = Math.max(1, Math.round(img.naturalHeight * k));
+        var g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url); resolve(c.toDataURL('image/jpeg', q));
+      };
+      img.onerror = function(){ reject(new Error('Rasm ochilmadi')); }; img.src = url;
+    });
+  }
+  async function readReceipt(file){
+    var full = await makeJpeg(file, 1100, 0.72);
+    if (full.length > 600000) full = await makeJpeg(file, 900, 0.55);
+    if (full.length > 650000) throw new Error('Rasm juda katta');
+    return { full: full, thumb: await makeJpeg(file, 140, 0.6) };
+  }
+  async function lateReceipt(file, no){
+    try {
+      var rc = await readReceipt(file);
+      var r = await sb.rpc('c_attach_receipt', { p_token: state.token, p_order: no, p_receipt: rc.full, p_thumb: rc.thumb });
+      if (r.error) { toast('Xatolik: ' + r.error.message); return; }
+      if (r.data && r.data.error) { toast(r.data.error); return; }
+      state.orders.forEach(function(o){ if (String(o.no) === String(no)) o.thumb = rc.thumb; }); save('qs_orders', state.orders);
+      toast('Chek yuborildi'); if (state.tab === 'orders') render();
+    } catch(e){ toast('Chek yuborilmadi: ' + (e.message || '')); }
+  }
+  document.addEventListener('change', async function(e){
+    var t = e.target; if (!t || !t.files || !t.files[0]) return;
+    var f = t.files[0];
+    if (t.id === 'rc_file') {
+      try { state.rcpt = await readReceipt(f); var bx = $('rcpt_box'); if (bx) bx.innerHTML = rcptBoxHtml(); toast('Chek yuklandi'); }
+      catch(err){ toast('Chek yuklanmadi: ' + (err.message || '')); }
+      t.value = '';
+    } else if (t.id === 'rc_late') { var no = state.attachNo; t.value = ''; if (no) lateReceipt(f, no); }
+  });
+  document.addEventListener('click', async function(e){
+    var t = e.target.closest('[data-copy],[data-rview],[data-rmrc],[data-rord],[data-attach],[data-dlall],#lbd'); if (!t) return;
+    if (t.dataset.copy) { try { await navigator.clipboard.writeText(t.dataset.copy); toast('Karta raqami nusxalandi'); } catch(x){ toast('Nusxalab bo\'lmadi. Raqamni qo\'lda belgilang'); } }
+    else if (t.dataset.rview) { if (state.rcpt) showImgs([state.rcpt.full], 0, false); }
+    else if (t.dataset.rmrc) { state.rcpt = null; var bx = $('rcpt_box'); if (bx) bx.innerHTML = rcptBoxHtml(); }
+    else if (t.dataset.rord) {
+      var o = state.orders.filter(function(x){ return String(x.no) === t.dataset.rord; })[0];
+      showImgs([o ? o.thumb : t.src], 0, false);
+      try { var r = await sb.rpc('c_receipt', { p_token: state.token, p_order: +t.dataset.rord }); if (r.data && $('lb')) showImgs([r.data], 0, false); } catch(x){}
+    }
+    else if (t.dataset.attach) { state.attachNo = +t.dataset.attach; $('rc_late').click(); }
+    else if (t.id === 'lbd') { var lb = $('lb'); var n = lb ? Math.round(lb.scrollLeft / lb.clientWidth) : 0; var ok = await downloadImg((state.gal || [])[n], imgName(n)); toast(ok ? 'Rasm yuklab olindi' : 'Rasm yangi oynada ochildi. Bosib turib saqlang'); }
+    else if (t.dataset.dlall) { var gl = state.gal || []; for (var k = 0; k < gl.length; k++) { await downloadImg(gl[k], imgName(k)); await new Promise(function(r){ setTimeout(r, 400); }); } toast('Rasmlar yuklab olindi'); }
+  });
   document.addEventListener('scroll', function(e){
     var g = e.target; if (!g || g.id !== 'gal') return;
     var n = Math.round(g.scrollLeft / g.clientWidth), ds = document.querySelectorAll('#dots i');

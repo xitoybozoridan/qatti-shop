@@ -245,7 +245,7 @@ a{color:var(--gold2)}
     return '<select id="pf_cat"><option value="">— kategoriyasiz —</option>' + list.map(function(c){ return '<option value="' + esc(c) + '"' + (c === cur ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select>';
   }
   function openEdit(id){
-    var p = id === 'new' ? { name: '', description: '', emoji: '📦', image_url: '', price: '', old_price: '', group_size: 3, joined: 0, category: '', ends_at: null, active: true, sort: S.products.length + 1 }
+    var p = id === 'new' ? { name: '', description: '', emoji: '📦', image_url: '', price: '', old_price: '', group_size: 3, joined: 0, category: '', images: [], options: [], ends_at: null, active: true, sort: S.products.length + 1 }
       : JSON.parse(JSON.stringify(S.products.filter(function(x){ return String(x.id) === String(id); })[0] || {}));
     S.editing = p;
     var hl = p.ends_at ? Math.max(0, hoursLeft(p.ends_at)) : '';
@@ -255,7 +255,10 @@ a{color:var(--gold2)}
       '<div id="pf_pic" class="row" style="margin-bottom:10px">' + picBlock(p) + '</div>' +
       '<input type="file" id="pf_file" accept="image/*" style="display:none">' +
       '<label>Nomi</label><input id="pf_name" value="' + esc(p.name) + '">' +
+      '<div id="pf_gal" style="margin-bottom:10px">' + galBlock(p) + '</div>' +
+      '<input type="file" id="pf_file2" accept="image/*" multiple style="display:none">' +
       '<label>Kategoriya</label>' + catSelect(p.category) +
+      '<label>Tanlov (rang, o\'lcham...) — har qatorda bittadan, masalan:<br>Rang: Qora, Oq, Qizil</label><textarea id="pf_opts" rows="3" placeholder="Rang: Qora, Oq&#10;O\'lcham: S, M, L">' + esc(optsToText(p.options)) + '</textarea>' +
       '<label>Tavsif</label><textarea id="pf_desc" rows="3">' + esc(p.description) + '</textarea>' +
       '<div class="card" style="margin-bottom:12px"><b style="font-size:14px">🧮 Yuan → so\'m hisoblagich</b>' +
       '<div class="grid2" style="margin-top:8px"><div><label>Xitoy narxi (¥)</label><input id="cc_yuan" type="number" inputmode="decimal" placeholder="masalan 25"></div>' +
@@ -275,6 +278,34 @@ a{color:var(--gold2)}
       '<button class="btn" id="pf_save">Saqlash</button>' +
       (p.id ? '<button class="btn danger" style="margin-top:10px" data-delprod="' + p.id + '">Mahsulotni o\'chirish</button>' : '') + '</div>';
     $('modal').classList.add('show'); $('modal').scrollTop = 0;
+  }
+  function optsToText(o){ return (o || []).map(function(x){ return x.name + ': ' + (x.values || []).join(', '); }).join('\n'); }
+  function textToOpts(t){
+    return t.split('\n').map(function(l){
+      var i = l.indexOf(':'); if (i < 1) return null;
+      var vals = l.slice(i + 1).split(',').map(function(v){ return v.trim(); }).filter(Boolean);
+      return vals.length ? { name: l.slice(0, i).trim(), values: vals } : null;
+    }).filter(Boolean);
+  }
+  function galBlock(p){
+    var im = p.images || [];
+    return '<div class="muted" style="margin-bottom:6px">Qo\'shimcha rasmlar (' + im.length + '/6)</div><div class="row" style="flex-wrap:wrap;gap:8px">' +
+      im.map(function(u, i){ return '<div style="position:relative"><div class="thumb"><img src="' + esc(u) + '" alt=""></div><button class="btn small danger" style="position:absolute;top:-6px;right:-6px;padding:2px 7px" data-rmgal="' + i + '">✕</button></div>'; }).join('') +
+      (im.length < 6 ? '<button class="btn small ghost" data-pickgal="1">＋ Rasm</button>' : '') + '</div><div class="muted" id="pf_up2" style="margin-top:6px"></div>';
+  }
+  async function uploadGallery(files){
+    var up = $('pf_up2'); var im = S.editing.images = S.editing.images || [];
+    for (var k = 0; k < files.length && im.length < 6; k++) {
+      up.textContent = 'Yuklanmoqda ' + (k + 1) + '/' + files.length + '...';
+      try {
+        var blob = await compress(files[k], 900, 0.82);
+        var path = Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '.jpg';
+        var r = await sb.storage.from('product-images').upload(path, blob, { contentType: 'image/jpeg', upsert: false });
+        if (r.error) throw r.error;
+        im.push(sb.storage.from('product-images').getPublicUrl(path).data.publicUrl);
+      } catch(e){ toast('Rasm yuklanmadi: ' + errMsg(e)); }
+    }
+    $('pf_gal').innerHTML = galBlock(S.editing);
   }
   function picBlock(p){
     return thumb(p) + '<div style="flex:1"><button class="btn small ghost" data-pickimg="1">📷 Rasm yuklash</button> ' +
@@ -313,7 +344,7 @@ a{color:var(--gold2)}
     var hrs = $('pf_hours').value.trim();
     var ends = p.ends_at || null;
     if (hrs === '') ends = null; else if (hrs !== p._hl0) ends = new Date(Date.now() + parseFloat(hrs) * 3600000).toISOString();
-    var row = { name: name, description: $('pf_desc').value.trim(), emoji: $('pf_emoji').value.trim() || '📦', category: $('pf_cat').value, image_url: p.image_url || '',
+    var row = { name: name, description: $('pf_desc').value.trim(), emoji: $('pf_emoji').value.trim() || '📦', category: $('pf_cat').value, images: p.images || [], options: textToOpts($('pf_opts').value), image_url: p.image_url || '',
       price: price, old_price: parseFloat($('pf_old').value) || 0, group_size: Math.max(1, parseInt($('pf_gs').value, 10) || 1),
       joined: Math.max(0, parseInt($('pf_joined').value, 10) || 0), ends_at: ends, active: $('pf_active').checked, sort: parseInt($('pf_sort').value, 10) || 0 };
     var btn = $('pf_save'); btn.disabled = true; btn.textContent = 'Saqlanmoqda...';
@@ -389,7 +420,7 @@ a{color:var(--gold2)}
 
   /* ---------- Hodisalar ---------- */
   document.addEventListener('click', async function(e){
-    var t = e.target.closest('[data-tab],[data-filter],[data-edit],[data-closemodal],[data-pickimg],[data-rmimg],[data-delprod],[data-delorder],#l_go,#pf_save,#cc_use,#cc_save,#tx_save,#logout,#refresh');
+    var t = e.target.closest('[data-tab],[data-filter],[data-edit],[data-closemodal],[data-pickimg],[data-pickgal],[data-rmgal],[data-rmimg],[data-delprod],[data-delorder],#l_go,#pf_save,[data-pickgal],[data-rmgal],#cc_use,#cc_save,#tx_save,#logout,#refresh');
     if (!t) return;
     if (t.id === 'l_go') return doLogin();
     if (t.id === 'logout') return logout();
@@ -399,6 +430,8 @@ a{color:var(--gold2)}
     if (t.dataset.edit) return openEdit(t.dataset.edit);
     if (t.dataset.closemodal) return closeModal();
     if (t.dataset.pickimg) return $('pf_file').click();
+    if (t.dataset.pickgal) return $('pf_file2').click();
+    if (t.dataset.rmgal !== undefined) { S.editing.images.splice(+t.dataset.rmgal, 1); $('pf_gal').innerHTML = galBlock(S.editing); return; }
     if (t.dataset.rmimg) { S.editing.image_url = ''; $('pf_pic').innerHTML = picBlock(S.editing); return; }
     if (t.dataset.delprod) return delProduct(+t.dataset.delprod);
     if (t.dataset.delorder) return delOrder(+t.dataset.delorder);
@@ -414,6 +447,7 @@ a{color:var(--gold2)}
     if (t.dataset && t.dataset.status) return setStatus(+t.dataset.status, t.value);
     if (t.dataset && t.dataset.anote) return saveAdminNote(+t.dataset.anote, t.value.trim());
     if (t.id === 'pf_file' && t.files && t.files[0]) { uploadImage(t.files[0]); t.value = ''; }
+    if (t.id === 'pf_file2' && t.files && t.files.length) { uploadGallery(Array.prototype.slice.call(t.files)); t.value = ''; }
   });
   setInterval(async function(){
     if (document.hidden || !$('view') || S.tab !== 'orders' || $('modal').classList.contains('show')) return;

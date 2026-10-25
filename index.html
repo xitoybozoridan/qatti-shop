@@ -202,6 +202,10 @@ label{font-size:12px;color:var(--muted);display:block;margin:0 0 4px 2px}
     }
     return out.join(', ');
   }
+  function splitOpt(n){
+    n = String(n || ''); var m = n.match(/^(.*?)\s*\(([^()]*:[^()]*)\)\s*$/);
+    return m ? { name: m[1], opts: m[2].split(/,\s*(?=[^,]*:)/) } : { name: n, opts: [] };
+  }
   function cartCount(){ return state.cart.reduce(function(s, i){ return s + i.qty; }, 0); }
   function hoursLeft(p){ return p.endsAt ? Math.ceil((new Date(p.endsAt).getTime() - Date.now()) / 3600000) : null; }
   function timeLabel(p){
@@ -334,7 +338,7 @@ label{font-size:12px;color:var(--muted);display:block;margin:0 0 4px 2px}
     if (!state.orders.length) return '<div class="empty"><b>📦</b>Hali buyurtma yo\'q.</div>';
     return state.orders.slice().reverse().map(function(o){
       return '<div class="order"><b>#' + esc(o.no) + '</b> · ' + esc(o.date) + '<br>' +
-        o.items.map(function(i){ return esc(i.name) + ' × ' + i.qty + (i.group ? ' (guruh)' : ''); }).join('<br>') +
+        o.items.map(function(i){ var sp = splitOpt(i.name); return '<div style="margin-bottom:6px"><b>' + esc(sp.name) + '</b> × ' + i.qty + (i.group ? ' (guruh)' : '') + sp.opts.map(function(x){ return '<div class="muted" style="margin-left:10px">' + esc(x) + '</div>'; }).join('') + '</div>'; }).join('') +
         '<br>Jami: <b>' + money(o.total) + '</b><br>' + statusHtml(o.no) + '</div>';
     }).join('');
   }

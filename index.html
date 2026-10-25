@@ -127,6 +127,27 @@ label{font-size:12px;color:var(--muted);display:block;margin:0 0 4px 2px}
   function groupMode(){ return state.shop.group_mode !== false; }
   // Guruh rejimi o'chiq bo'lsa hamma narsa bitta narxda (p.price). Yoqiq bo'lsa: guruh = price, yakka = oldPrice.
   function unitPrice(p, group){ return (groupMode() && !group) ? soloPrice(p) : p.price; }
+  var STATUS_TXT = { new: ['Qabul qilindi', 1], confirmed: ['Tasdiqlandi', 2], purchased: ['Xitoydan sotib olindi', 3],
+    shipped: ["Yo'lda", 4], arrived: ['Keldi — olib ketishingiz mumkin', 5], done: ['Yakunlandi', 5], cancelled: ['Bekor qilindi', 0] };
+  function statusHtml(no){
+    var s = state.statuses[no] || 'new', t = STATUS_TXT[s] || STATUS_TXT['new'];
+    if (s === 'cancelled') return '<span class="st" style="color:var(--red)">' + t[0] + '</span>';
+    return '<span class="st">' + t[0] + '</span><div class="bar" style="margin-top:6px"><i style="width:' + (t[1] * 20) + '%"></i></div>';
+  }
+  async function refreshStatuses(){
+    if (!sb || !state.orders.length) return;
+    var byPhone = {};
+    state.orders.forEach(function(o){ if (o.phone) (byPhone[o.phone] = byPhone[o.phone] || []).push(o.no); });
+    var changed = false;
+    for (var ph in byPhone) {
+      try {
+        var r = await sb.rpc('order_statuses', { p_ids: byPhone[ph], p_phone: ph });
+        if (r.error || !r.data) continue;
+        r.data.forEach(function(x){ if (state.statuses[x.id] !== x.status) { state.statuses[x.id] = x.status; changed = true; } });
+      } catch(e){}
+    }
+    if (changed) { save('qs_status', state.statuses); if (state.tab === 'orders') render(); }
+  }
   function normalizeCart(){
     var m = {}, out = [];
     state.cart.forEach(function(i){
@@ -241,7 +262,7 @@ label{font-size:12px;color:var(--muted);display:block;margin:0 0 4px 2px}
     return state.orders.slice().reverse().map(function(o){
       return '<div class="order"><b>#' + esc(o.no) + '</b> · ' + esc(o.date) + '<br>' +
         o.items.map(function(i){ return esc(i.name) + ' × ' + i.qty + (i.group ? ' (guruh)' : ''); }).join('<br>') +
-        '<br>Jami: <b>' + money(o.total) + '</b><br><span class="st">Qabul qilindi</span></div>';
+        '<br>Jami: <b>' + money(o.total) + '</b><br>' + statusHtml(o.no) + '</div>';
     }).join('');
   }
 
@@ -313,7 +334,7 @@ label{font-size:12px;color:var(--muted);display:block;margin:0 0 4px 2px}
     } catch(e){ res = { error: { message: 'Tarmoq xatosi' } }; }
     if (res.error) { btn.disabled = false; btn.textContent = 'Buyurtma yuborish'; toast('Xatolik: ' + (res.error.message || 'qayta urinib ko\'ring')); return; }
     var no = res.data;
-    state.orders.push({ no: no, date: new Date().toLocaleString('ru'), items: items, total: total }); save('qs_orders', state.orders);
+    state.orders.push({ no: no, date: new Date().toLocaleString('ru'), items: items, total: total, phone: phone }); save('qs_orders', state.orders);
     state.cart = []; save('qs_cart', state.cart);
     var msg = '🛍 Buyurtma #' + no + '\n' + items.map(function(i){ return '• ' + i.name + ' × ' + i.qty + (i.group ? ' (guruh)' : ''); }).join('\n') +
       '\nJami: ' + money(total) + '\n👤 ' + name + '\n📞 ' + phone;
@@ -330,7 +351,7 @@ label{font-size:12px;color:var(--muted);display:block;margin:0 0 4px 2px}
   document.addEventListener('click', function(e){
     var t = e.target.closest('[data-tab],[data-open],[data-addg],[data-adds],[data-share],[data-inc],[data-dec],#send,#x,#x2,#bg');
     if (!t) return;
-    if (t.dataset.tab) { state.tab = t.dataset.tab; render(); }
+    if (t.dataset.tab) { state.tab = t.dataset.tab; render(); if (state.tab === 'orders') refreshStatuses(); }
     else if (t.dataset.open) openProduct(+t.dataset.open);
     else if (t.dataset.addg) { addToCart(+t.dataset.addg, true); closeSheet(); }
     else if (t.dataset.adds) { addToCart(+t.dataset.adds, false); closeSheet(); }
@@ -342,15 +363,16 @@ label{font-size:12px;color:var(--muted);display:block;margin:0 0 4px 2px}
   });
 
   async function init(){
-    state.cart = load('qs_cart', []); state.orders = load('qs_orders', []);
+    state.cart = load('qs_cart', []); state.orders = load('qs_orders', []); state.statuses = load('qs_status', {});
     var ok = await loadData();
     if (!ok) { $('main').innerHTML = '<div class="empty"><b>📡</b>Mahsulotlar yuklanmadi.<br>Internetni tekshirib, qayta urinib ko\'ring.</div>'; renderNav(); }
     else {
       render();
+      refreshStatuses();
       var q = new URLSearchParams(location.search).get('p');
       if (q) openProduct(+q);
     }
-    document.addEventListener('visibilitychange', function(){ if (!document.hidden && state.tab === 'home') loadData().then(function(){ if (state.tab === 'home') render(); }); });
+    document.addEventListener('visibilitychange', function(){ if (!document.hidden) refreshStatuses(); if (!document.hidden && state.tab === 'home') loadData().then(function(){ if (state.tab === 'home') render(); }); });
     if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(function(){});
   }
   init();

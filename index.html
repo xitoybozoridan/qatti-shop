@@ -148,6 +148,11 @@ label{font-size:12px;color:var(--muted);display:block;margin:0 0 4px 2px}
   function unitPrice(p, group){ return (groupMode() && !group) ? soloPrice(p) : p.price; }
   var STATUS_TXT = { new: ['Qabul qilindi', 1], confirmed: ['Tasdiqlandi', 2], purchased: ['Xitoydan sotib olindi', 3],
     shipped: ["Yo'lda", 4], arrived: ['Keldi — olib ketishingiz mumkin', 5], done: ['Yakunlandi', 5], cancelled: ['Bekor qilindi', 0] };
+  function shipHtml(o){
+    var sh = (state.ship && state.ship[o.no]) || 0;
+    if (!(sh > 0)) return '<span class="muted">Yuk (kargo): tovar kelgach hisoblanadi</span><br>';
+    return 'Yuk (kargo): <b>' + money(sh) + '</b><br>To\'lov jami: <b style="color:var(--gold2)">' + money(+o.total + sh) + '</b><br>';
+  }
   function statusHtml(no){
     var s = state.statuses[no] || 'new', t = STATUS_TXT[s] || STATUS_TXT['new'];
     if (s === 'cancelled') return '<span class="st" style="color:var(--red)">' + t[0] + '</span>';
@@ -162,10 +167,10 @@ label{font-size:12px;color:var(--muted);display:block;margin:0 0 4px 2px}
       try {
         var r = await sb.rpc('order_statuses', { p_ids: byPhone[ph], p_phone: ph });
         if (r.error || !r.data) continue;
-        r.data.forEach(function(x){ if (state.statuses[x.id] !== x.status) { state.statuses[x.id] = x.status; changed = true; } });
+        r.data.forEach(function(x){ var sh = +x.shipping || 0; if (state.statuses[x.id] !== x.status || (state.ship[x.id] || 0) !== sh) { state.statuses[x.id] = x.status; state.ship[x.id] = sh; changed = true; } });
       } catch(e){}
     }
-    if (changed) { save('qs_status', state.statuses); if (state.tab === 'orders') render(); }
+    if (changed) { save('qs_status', state.statuses); save('qs_ship', state.ship); if (state.tab === 'orders') render(); }
   }
   function normalizeCart(){
     var m = {}, out = [];
@@ -339,7 +344,7 @@ label{font-size:12px;color:var(--muted);display:block;margin:0 0 4px 2px}
     return state.orders.slice().reverse().map(function(o){
       return '<div class="order"><b>#' + esc(o.no) + '</b> · ' + esc(o.date) + '<br>' +
         o.items.map(function(i){ var sp = splitOpt(i.name); return '<div style="margin-bottom:6px"><b>' + esc(sp.name) + '</b> × ' + i.qty + (i.group ? ' (guruh)' : '') + sp.opts.map(function(x){ return '<div class="muted" style="margin-left:10px">' + esc(x) + '</div>'; }).join('') + '</div>'; }).join('') +
-        '<br>Jami: <b>' + money(o.total) + '</b><br>' + statusHtml(o.no) + '</div>';
+        '<br>Tovarlar: <b>' + money(o.total) + '</b><br>' + shipHtml(o) + statusHtml(o.no) + '</div>';
     }).join('');
   }
 
@@ -467,7 +472,7 @@ label{font-size:12px;color:var(--muted);display:block;margin:0 0 4px 2px}
   });
 
   async function init(){
-    state.cart = load('qs_cart', []); state.orders = load('qs_orders', []); state.statuses = load('qs_status', {});
+    state.cart = load('qs_cart', []); state.orders = load('qs_orders', []); state.statuses = load('qs_status', {}); state.ship = load('qs_ship', {});
     var ok = await loadData();
     if (!ok) { $('main').innerHTML = '<div class="empty"><b>📡</b>Mahsulotlar yuklanmadi.<br>Internetni tekshirib, qayta urinib ko\'ring.</div>'; renderNav(); }
     else {

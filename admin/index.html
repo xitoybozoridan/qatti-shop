@@ -68,6 +68,8 @@ a{color:var(--gold2)}
 .days div{flex:1;text-align:center;font-size:10px;color:var(--muted)}
 .days i{display:block;background:linear-gradient(180deg,var(--gold2),var(--gold));border-radius:5px 5px 0 0;min-height:3px;margin-bottom:3px}
 .ord{margin-top:10px}.ord.item{border-top:1px dashed var(--line);padding-top:8px}
+.rcp{width:72px;height:72px;object-fit:cover;border-radius:10px;border:1px solid var(--line);cursor:pointer}
+.rcbig{position:fixed;inset:0;background:rgba(0,0,0,.94);z-index:80;display:grid;place-items:center;padding:10px;overflow:auto}.rcbig img{max-width:100%;max-height:100%;object-fit:contain}
 .kv{font-size:14px;margin-bottom:3px}.kv span{color:var(--muted)}
 </style>
 </head>
@@ -92,7 +94,7 @@ a{color:var(--gold2)}
     shipped: ["Yo'lda", '#b48cff'], arrived: ['Keldi', '#3ecf8e'], done: ['Yakunlandi', '#3ecf8e'], cancelled: ['Bekor qilindi', '#9a978c'] };
   var sb = null;
   try { sb = window.supabase.createClient(window.QSHOP.SUPABASE_URL, window.QSHOP.SUPABASE_KEY); } catch(e){}
-  var S = { tab: 'orders', orders: [], products: [], shop: {}, info: {}, cats: [], cq: '', copen: '', accts: [], calc: { rate: 1750, markup: 30 }, filter: 'all', editing: null, busy: false };
+  var S = { tab: 'orders', orders: [], products: [], shop: {}, info: {}, cats: [], pay: {}, cq: '', copen: '', accts: [], calc: { rate: 1750, markup: 30 }, filter: 'all', editing: null, busy: false };
 
   function toast(t){ var el = $('toast'); el.textContent = t; el.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(function(){ el.classList.remove('show'); }, 2600); }
   function fmtDate(iso){ try { return new Date(iso).toLocaleString('ru', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); } catch(e){ return ''; } }
@@ -130,7 +132,7 @@ a{color:var(--gold2)}
 
   /* ---------- Ma'lumot ---------- */
   async function loadOrders(){
-    var r = await sb.from('orders').select('*').order('created_at', { ascending: false }).limit(1000);
+    var r = await sb.from('orders').select('*').order('created_at', { ascending: false }).limit(500);
     if (r.error) throw r.error; S.orders = r.data || [];
   }
   async function loadProducts(){
@@ -140,7 +142,7 @@ a{color:var(--gold2)}
   async function loadSettings(){
     var r = await sb.from('settings').select('key,value');
     if (r.error) throw r.error;
-    (r.data || []).forEach(function(x){ if (x.key === 'shop') S.shop = x.value || {}; if (x.key === 'info') S.info = x.value || {}; if (x.key === 'calc' && x.value) S.calc = { rate: +x.value.rate || 1750, markup: x.value.markup === undefined ? 30 : +x.value.markup }; if (x.key === 'categories') S.cats = (x.value && x.value.list) || []; });
+    (r.data || []).forEach(function(x){ if (x.key === 'shop') S.shop = x.value || {}; if (x.key === 'info') S.info = x.value || {}; if (x.key === 'calc' && x.value) S.calc = { rate: +x.value.rate || 1750, markup: x.value.markup === undefined ? 30 : +x.value.markup }; if (x.key === 'pay') S.pay = x.value || {}; if (x.key === 'categories') S.cats = (x.value && x.value.list) || []; });
   }
   async function refreshAll(){
     try { await Promise.all([loadOrders(), loadProducts(), loadSettings()]); } catch(e){ toast('Yuklashda xatolik: ' + errMsg(e)); }
@@ -182,6 +184,8 @@ a{color:var(--gold2)}
           return '<div class="ord item">' + kv('Mahsulot', sp.name) + sp.opts.map(function(x){ var k = x.indexOf(':'); return kv(x.slice(0, k), x.slice(k + 1).trim()); }).join('') +
             kv('Soni', i.qty + ' dona' + (i.group ? ' (guruh)' : '')) + kv('Narxi', money(i.unit * i.qty)) + '</div>';
         }).join('') +
+        (o.receipt_thumb ? '<div class="ord item"><div class="muted" style="margin-bottom:6px">To\'lov cheki (kattalashtirish uchun bosing):</div><img class="rcp" data-rcp="' + o.id + '" src="' + esc(o.receipt_thumb) + '" alt="chek"></div>' : (S.pay && S.pay.card ? '<div class="ord item"><span class="muted">To\'lov cheki: </span><b style="color:#ff4d4f">yuklanmagan</b></div>' : '')) +
+        '<label style="margin:8px 0;font-size:14px;color:var(--text)"><input type="checkbox" data-paid="' + o.id + '"' + (o.paid ? ' checked' : '') + '> ✅ To\'lov qabul qilindi</label>' +
         '<div class="row sp"><span class="muted">Tovarlar</span><b>' + money(o.total) + '</b></div>' +
         '<label>Yuk (kargo) narxi, so\'m — mijoz ko\'radi</label><input type="number" inputmode="numeric" data-ship="' + o.id + '" value="' + esc(+o.shipping || '') + '" placeholder="Masalan: 25000">' +
         '<div class="row sp" style="margin-bottom:10px"><span class="muted">To\'lov jami</span><b style="color:var(--gold2)">' + money((+o.total || 0) + (+o.shipping || 0)) + '</b></div>' +
@@ -208,6 +212,17 @@ a{color:var(--gold2)}
       }
     }
     toast('Holat yangilandi'); render();
+  }
+  async function setPaid(id, v){
+    var r = await sb.from('orders').update({ paid: v }).eq('id', id);
+    if (r.error) { toast('Xatolik: ' + errMsg(r.error)); render(); return; }
+    var o = S.orders.filter(function(x){ return x.id === id; })[0]; if (o) o.paid = v; toast(v ? 'To\'lov qabul qilindi' : 'Belgi olib tashlandi');
+  }
+  async function showReceipt(id){
+    var o = S.orders.filter(function(x){ return x.id === id; })[0];
+    var ov = document.createElement('div'); ov.className = 'rcbig'; ov.id = 'rcbig'; ov.innerHTML = '<img src="' + esc(o ? o.receipt_thumb : '') + '" alt="">'; document.body.appendChild(ov);
+    ov.addEventListener('click', function(){ ov.remove(); });
+    try { var r = await sb.from('receipts').select('image').eq('order_id', id).maybeSingle(); if (r.data && r.data.image && $('rcbig')) ov.innerHTML = '<img src="' + esc(r.data.image) + '" alt="">'; } catch(e){}
   }
   async function saveShipping(id, val){
     var n = Math.max(0, parseFloat(val) || 0);
@@ -389,6 +404,11 @@ a{color:var(--gold2)}
       '<label>Sizning Telegram username (@siz)</label><input id="tx_tg" value="' + esc(sh.admin_telegram) + '" placeholder="@username">' +
       '<label style="margin:6px 0 4px;font-size:14px;color:var(--text)"><input type="checkbox" id="tx_gm"' + (gm() ? ' checked' : '') + '> Guruh rejimi</label>' +
       '<div class="muted" style="margin-bottom:14px">' + "O'chirilsa: ilova oddiy do'kon bo'ladi, mahsulotda bitta narx ko'rinadi, guruhga qo'shilish tugmasi yo'qoladi. Banner va «Ma'lumot» matnlarini ham mosiga o'zgartiring." + '</div>' +
+      '<h2>To\'lov</h2><div class="muted" style="margin-bottom:8px">Karta raqami bo\'sh bo\'lsa, mijozlarda to\'lov bo\'limi chiqmaydi.</div>' +
+      '<label>Karta raqami</label><input id="tx_card" inputmode="numeric" value="' + esc((S.pay || {}).card) + '" placeholder="8600 0000 0000 0000">' +
+      '<label>Karta egasi (ism)</label><input id="tx_holder" value="' + esc((S.pay || {}).holder) + '">' +
+      '<label>Izoh (masalan: bank nomi)</label><input id="tx_paynote" value="' + esc((S.pay || {}).note) + '">' +
+      '<label style="margin:6px 0 14px;font-size:14px;color:var(--text)"><input type="checkbox" id="tx_payreq"' + ((S.pay || {}).required === false ? '' : ' checked') + '> To\'lov cheki majburiy</label>' +
       '<h2>Kategoriyalar</h2><label>Har bir qator — bitta kategoriya</label><textarea id="tx_cats" rows="5">' + esc((S.cats || []).join('\n')) + '</textarea>' +
       '<h2>"Ma\'lumot" bo\'limi</h2>' +
       '<label>Qadamlar (har bir qator — bitta qadam)</label><textarea id="tx_steps" rows="7">' + esc((inf.steps || []).join('\n')) + '</textarea>' +
@@ -399,10 +419,11 @@ a{color:var(--gold2)}
     var shop = { name: $('tx_name').value.trim() || 'qSHOP', tagline: $('tx_tag').value.trim(), hero_title: $('tx_ht').value.trim(), hero_text: $('tx_hx').value.trim(), admin_telegram: $('tx_tg').value.trim(), group_mode: $('tx_gm').checked };
     var info = { steps: $('tx_steps').value.split('\n').map(function(s){ return s.trim(); }).filter(Boolean), note: $('tx_note').value.trim() };
     var cats = $('tx_cats').value.split('\n').map(function(s){ return s.trim(); }).filter(function(x, i, a){ return x && a.indexOf(x) === i; });
+    var pay = { card: $('tx_card').value.trim(), holder: $('tx_holder').value.trim(), note: $('tx_paynote').value.trim(), required: $('tx_payreq').checked };
     var now = new Date().toISOString();
-    var r = await sb.from('settings').upsert([{ key: 'shop', value: shop, updated_at: now }, { key: 'info', value: info, updated_at: now }, { key: 'categories', value: { list: cats }, updated_at: now }]);
+    var r = await sb.from('settings').upsert([{ key: 'shop', value: shop, updated_at: now }, { key: 'info', value: info, updated_at: now }, { key: 'categories', value: { list: cats }, updated_at: now }, { key: 'pay', value: pay, updated_at: now }]);
     if (r.error) { toast('Xatolik: ' + errMsg(r.error)); return; }
-    S.shop = shop; S.info = info; S.cats = cats; toast('Saqlandi. Mijozlarda darrov yangilanadi');
+    S.shop = shop; S.info = info; S.cats = cats; S.pay = pay; toast('Saqlandi. Mijozlarda darrov yangilanadi');
   }
 
   /* ---------- Statistika ---------- */
@@ -499,11 +520,12 @@ a{color:var(--gold2)}
 
   /* ---------- Hodisalar ---------- */
   document.addEventListener('click', async function(e){
-    var t = e.target.closest('[data-tab],[data-cust],[data-resetpin],[data-block],[data-filter],[data-edit],[data-closemodal],[data-pickimg],[data-pickgal],[data-rmgal],[data-rmimg],[data-delprod],[data-delorder],#l_go,#pf_save,[data-pickgal],[data-rmgal],#cc_use,#cc_save,#tx_save,#logout,#refresh');
+    var t = e.target.closest('[data-tab],[data-cust],[data-rcp],[data-resetpin],[data-block],[data-filter],[data-edit],[data-closemodal],[data-pickimg],[data-pickgal],[data-rmgal],[data-rmimg],[data-delprod],[data-delorder],#l_go,#pf_save,[data-pickgal],[data-rmgal],#cc_use,#cc_save,#tx_save,#logout,#refresh');
     if (!t) return;
     if (t.id === 'l_go') return doLogin();
     if (t.id === 'logout') return logout();
     if (t.id === 'refresh') { await refreshAll(); render(); toast('Yangilandi'); return; }
+    if (t.dataset.rcp) return showReceipt(+t.dataset.rcp);
     if (t.dataset.resetpin) return resetPin(+t.dataset.resetpin);
     if (t.dataset.block) return toggleBlock(+t.dataset.block, t.dataset.to === '1');
     if (t.dataset.cust !== undefined) { S.copen = S.copen === t.dataset.cust ? '' : t.dataset.cust; $('clist').innerHTML = custListHtml(); return; }
@@ -527,6 +549,7 @@ a{color:var(--gold2)}
   document.addEventListener('change', function(e){
     var t = e.target;
     if (t.dataset && t.dataset.status) return setStatus(+t.dataset.status, t.value);
+    if (t.dataset && t.dataset.paid) return setPaid(+t.dataset.paid, t.checked);
     if (t.dataset && t.dataset.ship) return saveShipping(+t.dataset.ship, t.value);
     if (t.dataset && t.dataset.anote) return saveAdminNote(+t.dataset.anote, t.value.trim());
     if (t.id === 'pf_file' && t.files && t.files[0]) { uploadImage(t.files[0]); t.value = ''; }

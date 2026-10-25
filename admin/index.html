@@ -85,7 +85,7 @@ a{color:var(--gold2)}
     shipped: ["Yo'lda", '#b48cff'], arrived: ['Keldi', '#3ecf8e'], done: ['Yakunlandi', '#3ecf8e'], cancelled: ['Bekor qilindi', '#9a978c'] };
   var sb = null;
   try { sb = window.supabase.createClient(window.QSHOP.SUPABASE_URL, window.QSHOP.SUPABASE_KEY); } catch(e){}
-  var S = { tab: 'orders', orders: [], products: [], shop: {}, info: {}, cats: [], filter: 'all', editing: null, busy: false };
+  var S = { tab: 'orders', orders: [], products: [], shop: {}, info: {}, cats: [], calc: { rate: 1750, markup: 30 }, filter: 'all', editing: null, busy: false };
 
   function toast(t){ var el = $('toast'); el.textContent = t; el.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(function(){ el.classList.remove('show'); }, 2600); }
   function fmtDate(iso){ try { return new Date(iso).toLocaleString('ru', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); } catch(e){ return ''; } }
@@ -133,7 +133,7 @@ a{color:var(--gold2)}
   async function loadSettings(){
     var r = await sb.from('settings').select('key,value');
     if (r.error) throw r.error;
-    (r.data || []).forEach(function(x){ if (x.key === 'shop') S.shop = x.value || {}; if (x.key === 'info') S.info = x.value || {}; if (x.key === 'categories') S.cats = (x.value && x.value.list) || []; });
+    (r.data || []).forEach(function(x){ if (x.key === 'shop') S.shop = x.value || {}; if (x.key === 'info') S.info = x.value || {}; if (x.key === 'calc' && x.value) S.calc = { rate: +x.value.rate || 1750, markup: x.value.markup === undefined ? 30 : +x.value.markup }; if (x.key === 'categories') S.cats = (x.value && x.value.list) || []; });
   }
   async function refreshAll(){
     try { await Promise.all([loadOrders(), loadProducts(), loadSettings()]); } catch(e){ toast('Yuklashda xatolik: ' + errMsg(e)); }
@@ -223,6 +223,21 @@ a{color:var(--gold2)}
         '</div></div><span class="muted">✏️</span></div></div>';
     }).join('');
   }
+  function calcVals(){
+    var y = parseFloat($('cc_yuan').value) || 0, r = parseFloat($('cc_rate').value) || 0, m = parseFloat($('cc_mk').value) || 0, sh = parseFloat($('cc_ship').value) || 0;
+    var cost = y * r + sh, sell = Math.ceil(cost * (1 + m / 100) / 1000) * 1000;
+    return { y: y, cost: cost, sell: sell, profit: sell - cost };
+  }
+  function calcUpdate(){
+    var c = calcVals(), el = $('cc_out'); if (!el) return;
+    el.innerHTML = c.y > 0 ? 'Tannarx: <b>' + money(Math.round(c.cost)) + '</b><br>Sotuv narxi: <b style="color:var(--gold2)">' + money(c.sell) + '</b><br>Foyda: ' + money(Math.round(c.profit)) : '¥ narxini kiriting';
+  }
+  async function calcSave(){
+    var v = { rate: parseFloat($('cc_rate').value) || 1750, markup: parseFloat($('cc_mk').value) || 0 };
+    var r = await sb.from('settings').upsert([{ key: 'calc', value: v, updated_at: new Date().toISOString() }]);
+    if (r.error) { toast('Xatolik: ' + errMsg(r.error)); return; }
+    S.calc = v; toast('Kurs saqlandi');
+  }
   function catSelect(cur){
     cur = cur || '';
     var list = S.cats.slice();
@@ -242,6 +257,13 @@ a{color:var(--gold2)}
       '<label>Nomi</label><input id="pf_name" value="' + esc(p.name) + '">' +
       '<label>Kategoriya</label>' + catSelect(p.category) +
       '<label>Tavsif</label><textarea id="pf_desc" rows="3">' + esc(p.description) + '</textarea>' +
+      '<div class="card" style="margin-bottom:12px"><b style="font-size:14px">🧮 Yuan → so\'m hisoblagich</b>' +
+      '<div class="grid2" style="margin-top:8px"><div><label>Xitoy narxi (¥)</label><input id="cc_yuan" type="number" inputmode="decimal" placeholder="masalan 25"></div>' +
+      '<div><label>Yuan kursi (so\'m)</label><input id="cc_rate" type="number" inputmode="numeric" value="' + esc(S.calc.rate) + '"></div>' +
+      '<div><label>Ustama foyda (%)</label><input id="cc_mk" type="number" inputmode="numeric" value="' + esc(S.calc.markup) + '"></div>' +
+      '<div><label>Yuk narxi (1 dona, so\'m)</label><input id="cc_ship" type="number" inputmode="numeric" value="0"></div></div>' +
+      '<div id="cc_out" class="muted" style="margin-bottom:8px">¥ narxini kiriting</div>' +
+      '<div class="row"><button class="btn small" id="cc_use">Narxga qo\'yish</button><button class="btn small" id="cc_save">Kurs va foizni saqlash</button></div></div>' +
       '<div class="grid2"><div><label>' + (gm() ? "Guruh narxi (so'm)" : "Narx (so'm)") + '</label><input id="pf_price" type="number" inputmode="numeric" value="' + esc(p.price) + '"></div>' +
       '<div><label>' + (gm() ? "Yakka narx (so'm)" : "Eski narx (ustiga chiziladi, ixtiyoriy)") + '</label><input id="pf_old" type="number" inputmode="numeric" value="' + esc(p.old_price) + '"></div>' +
       '<div' + hide + '><label>Guruh hajmi (kishi)</label><input id="pf_gs" type="number" inputmode="numeric" value="' + esc(p.group_size) + '"></div>' +
@@ -367,7 +389,7 @@ a{color:var(--gold2)}
 
   /* ---------- Hodisalar ---------- */
   document.addEventListener('click', async function(e){
-    var t = e.target.closest('[data-tab],[data-filter],[data-edit],[data-closemodal],[data-pickimg],[data-rmimg],[data-delprod],[data-delorder],#l_go,#pf_save,#tx_save,#logout,#refresh');
+    var t = e.target.closest('[data-tab],[data-filter],[data-edit],[data-closemodal],[data-pickimg],[data-rmimg],[data-delprod],[data-delorder],#l_go,#pf_save,#cc_use,#cc_save,#tx_save,#logout,#refresh');
     if (!t) return;
     if (t.id === 'l_go') return doLogin();
     if (t.id === 'logout') return logout();
@@ -381,9 +403,12 @@ a{color:var(--gold2)}
     if (t.dataset.delprod) return delProduct(+t.dataset.delprod);
     if (t.dataset.delorder) return delOrder(+t.dataset.delorder);
     if (t.id === 'pf_save') return saveProduct();
+    if (t.id === 'cc_use') { var c = calcVals(); if (c.sell > 0) { $('pf_price').value = c.sell; toast('Narx qo\'yildi'); } else toast('Avval ¥ narxini kiriting'); return; }
+    if (t.id === 'cc_save') return calcSave();
     if (t.id === 'tx_save') return saveTexts();
   });
   document.addEventListener('keydown', function(e){ if (e.key === 'Enter' && e.target && (e.target.id === 'l_pass' || e.target.id === 'l_email')) doLogin(); });
+  document.addEventListener('input', function(e){ if (e.target && /^cc_/.test(e.target.id)) calcUpdate(); });
   document.addEventListener('change', function(e){
     var t = e.target;
     if (t.dataset && t.dataset.status) return setStatus(+t.dataset.status, t.value);

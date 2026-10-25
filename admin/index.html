@@ -92,7 +92,7 @@ a{color:var(--gold2)}
     shipped: ["Yo'lda", '#b48cff'], arrived: ['Keldi', '#3ecf8e'], done: ['Yakunlandi', '#3ecf8e'], cancelled: ['Bekor qilindi', '#9a978c'] };
   var sb = null;
   try { sb = window.supabase.createClient(window.QSHOP.SUPABASE_URL, window.QSHOP.SUPABASE_KEY); } catch(e){}
-  var S = { tab: 'orders', orders: [], products: [], shop: {}, info: {}, cats: [], cq: '', copen: '', calc: { rate: 1750, markup: 30 }, filter: 'all', editing: null, busy: false };
+  var S = { tab: 'orders', orders: [], products: [], shop: {}, info: {}, cats: [], cq: '', copen: '', accts: [], calc: { rate: 1750, markup: 30 }, filter: 'all', editing: null, busy: false };
 
   function toast(t){ var el = $('toast'); el.textContent = t; el.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(function(){ el.classList.remove('show'); }, 2600); }
   function fmtDate(iso){ try { return new Date(iso).toLocaleString('ru', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); } catch(e){ return ''; } }
@@ -416,7 +416,28 @@ a{color:var(--gold2)}
       if (o.status !== 'cancelled') c.sum += +o.total || 0;
       if (o.created_at > c.last) { c.last = o.created_at; c.name = o.customer_name; c.address = o.address; c.phone = o.phone; }
     });
+    S.accts.forEach(function(a){
+      var k = String(a.phone || '').replace(/\D/g, '').slice(-9);
+      var c = m[k];
+      if (!c) { c = m[k] = { key: k, name: a.name, phone: '+' + a.phone, address: a.address, orders: [], sum: 0, last: a.created_at }; out.push(c); }
+      c.acc = a;
+    });
     return out.sort(function(a, b){ return a.last < b.last ? 1 : -1; });
+  }
+  async function loadAccounts(){
+    try { var r = await sb.rpc('admin_customers'); if (!r.error && r.data) S.accts = r.data; } catch(e){}
+  }
+  async function resetPin(id){
+    var pin = prompt('Mijozga yangi PIN bering (4–6 ta raqam):'); if (pin === null) return;
+    if (!/^\d{4,6}$/.test(pin.trim())) { toast('PIN 4–6 ta raqam bo\'lsin'); return; }
+    var r = await sb.rpc('admin_reset_pin', { p_id: id, p_pin: pin.trim() });
+    if (r.error) toast('Xatolik: ' + errMsg(r.error)); else toast('PIN o\'zgartirildi. Mijozga ayting: ' + pin.trim());
+  }
+  async function toggleBlock(id, block){
+    if (!confirm(block ? 'Mijoz bloklansinmi? U buyurtma bera olmaydi.' : 'Blokdan chiqarilsinmi?')) return;
+    var r = await sb.rpc('admin_block', { p_id: id, p_blocked: block });
+    if (r.error) { toast('Xatolik: ' + errMsg(r.error)); return; }
+    await loadAccounts(); toast(block ? 'Bloklandi' : 'Blokdan chiqarildi'); $('clist').innerHTML = custListHtml();
   }
   function custListHtml(){
     var q = S.cq.trim().toLowerCase(), qd = q.replace(/\D/g, '');
@@ -428,12 +449,13 @@ a{color:var(--gold2)}
     return list.map(function(c){
       var d = phoneDigits(c.phone), open = S.copen === c.key, live = c.orders.filter(function(o){ return o.status !== 'cancelled'; }).length;
       return '<div class="card"><div class="row sp" data-cust="' + esc(c.key) + '" style="cursor:pointer"><div style="min-width:0"><div style="font-weight:700">' + esc(c.name) + '</div>' +
-        '<div class="muted">📞 ' + esc(c.phone) + '</div></div><div style="text-align:right"><b style="color:var(--gold2)">' + money(c.sum) + '</b><div class="muted">' + c.orders.length + ' ta buyurtma</div></div></div>' +
+        '<div class="muted">📞 ' + esc(c.phone) + (c.acc ? (c.acc.blocked ? ' · <span style="color:#ff4d4f">🚫 bloklangan</span>' : ' · <span style="color:#6fcf97">✅ hisob</span>') : '') + '</div></div><div style="text-align:right"><b style="color:var(--gold2)">' + money(c.sum) + '</b><div class="muted">' + c.orders.length + ' ta buyurtma</div></div></div>' +
         (open ? '<div class="muted" style="margin-top:8px">📍 ' + esc(c.address) + '</div>' +
+          (c.acc ? '<div class="muted" style="margin-top:4px">Ro\'yxatdan o\'tgan: ' + fmtDate(c.acc.created_at) + (c.acc.last_login ? ' · oxirgi kirish: ' + fmtDate(c.acc.last_login) : '') + '</div>' : '<div class="muted" style="margin-top:4px">Hisob ochmagan (eski buyurtma)</div>') +
           c.orders.map(function(o){ var st = STATUS[o.status] || [o.status, '#9a978c'];
             return '<div class="kv" style="margin-top:6px;border-top:1px dashed var(--line);padding-top:6px"><b>#' + o.id + '</b> · ' + fmtDate(o.created_at) + ' · <span style="color:' + st[1] + '">' + esc(st[0]) + '</span> · ' + money(o.total) + '<br><span class="muted">' +
               (o.items || []).map(function(i){ return esc(i.name) + ' × ' + esc(i.qty); }).join(', ') + '</span></div>'; }).join('') +
-          '<div class="row" style="margin-top:10px"><a class="btn small ghost" href="tel:+' + d + '">📞 Qo\'ng\'iroq</a><a class="btn small ghost" target="_blank" rel="noopener" href="https://t.me/+' + d + '">✈️ Telegram</a></div>' : '') +
+          '<div class="row" style="margin-top:10px;flex-wrap:wrap"><a class="btn small ghost" href="tel:+' + d + '">📞 Qo\'ng\'iroq</a><a class="btn small ghost" target="_blank" rel="noopener" href="https://t.me/+' + d + '">✈️ Telegram</a>' + (c.acc ? '<button class="btn small ghost" data-resetpin="' + c.acc.id + '">🔑 PIN tiklash</button><button class="btn small danger" data-block="' + c.acc.id + '" data-to="' + (c.acc.blocked ? '0' : '1') + '">' + (c.acc.blocked ? 'Blokdan chiqarish' : '🚫 Bloklash') + '</button>' : '') + '</div>' : '') +
         '</div>';
     }).join('');
   }
@@ -477,13 +499,15 @@ a{color:var(--gold2)}
 
   /* ---------- Hodisalar ---------- */
   document.addEventListener('click', async function(e){
-    var t = e.target.closest('[data-tab],[data-cust],[data-filter],[data-edit],[data-closemodal],[data-pickimg],[data-pickgal],[data-rmgal],[data-rmimg],[data-delprod],[data-delorder],#l_go,#pf_save,[data-pickgal],[data-rmgal],#cc_use,#cc_save,#tx_save,#logout,#refresh');
+    var t = e.target.closest('[data-tab],[data-cust],[data-resetpin],[data-block],[data-filter],[data-edit],[data-closemodal],[data-pickimg],[data-pickgal],[data-rmgal],[data-rmimg],[data-delprod],[data-delorder],#l_go,#pf_save,[data-pickgal],[data-rmgal],#cc_use,#cc_save,#tx_save,#logout,#refresh');
     if (!t) return;
     if (t.id === 'l_go') return doLogin();
     if (t.id === 'logout') return logout();
     if (t.id === 'refresh') { await refreshAll(); render(); toast('Yangilandi'); return; }
+    if (t.dataset.resetpin) return resetPin(+t.dataset.resetpin);
+    if (t.dataset.block) return toggleBlock(+t.dataset.block, t.dataset.to === '1');
     if (t.dataset.cust !== undefined) { S.copen = S.copen === t.dataset.cust ? '' : t.dataset.cust; $('clist').innerHTML = custListHtml(); return; }
-    if (t.dataset.tab) { S.tab = t.dataset.tab; if (S.tab === 'orders' || S.tab === 'stats' || S.tab === 'customers') { try { await loadOrders(); } catch(x){} } render(); window.scrollTo(0, 0); return; }
+    if (t.dataset.tab) { S.tab = t.dataset.tab; if (S.tab === 'orders' || S.tab === 'stats' || S.tab === 'customers') { try { await loadOrders(); } catch(x){} } if (S.tab === 'customers') await loadAccounts(); render(); window.scrollTo(0, 0); return; }
     if (t.dataset.filter) { S.filter = t.dataset.filter; render(); return; }
     if (t.dataset.edit) return openEdit(t.dataset.edit);
     if (t.dataset.closemodal) return closeModal();

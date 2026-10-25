@@ -85,7 +85,7 @@ a{color:var(--gold2)}
     shipped: ["Yo'lda", '#b48cff'], arrived: ['Keldi', '#3ecf8e'], done: ['Yakunlandi', '#3ecf8e'], cancelled: ['Bekor qilindi', '#9a978c'] };
   var sb = null;
   try { sb = window.supabase.createClient(window.QSHOP.SUPABASE_URL, window.QSHOP.SUPABASE_KEY); } catch(e){}
-  var S = { tab: 'orders', orders: [], products: [], shop: {}, info: {}, filter: 'all', editing: null, busy: false };
+  var S = { tab: 'orders', orders: [], products: [], shop: {}, info: {}, cats: [], filter: 'all', editing: null, busy: false };
 
   function toast(t){ var el = $('toast'); el.textContent = t; el.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(function(){ el.classList.remove('show'); }, 2600); }
   function fmtDate(iso){ try { return new Date(iso).toLocaleString('ru', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); } catch(e){ return ''; } }
@@ -133,7 +133,7 @@ a{color:var(--gold2)}
   async function loadSettings(){
     var r = await sb.from('settings').select('key,value');
     if (r.error) throw r.error;
-    (r.data || []).forEach(function(x){ if (x.key === 'shop') S.shop = x.value || {}; if (x.key === 'info') S.info = x.value || {}; });
+    (r.data || []).forEach(function(x){ if (x.key === 'shop') S.shop = x.value || {}; if (x.key === 'info') S.info = x.value || {}; if (x.key === 'categories') S.cats = (x.value && x.value.list) || []; });
   }
   async function refreshAll(){
     try { await Promise.all([loadOrders(), loadProducts(), loadSettings()]); } catch(e){ toast('Yuklashda xatolik: ' + errMsg(e)); }
@@ -216,15 +216,21 @@ a{color:var(--gold2)}
     return h + S.products.map(function(p){
       var hl = hoursLeft(p.ends_at);
       return '<div class="card"><div class="row" data-edit="' + p.id + '" style="cursor:pointer">' + thumb(p) +
-        '<div style="flex:1;min-width:0"><div style="font-weight:700;font-size:14px">' + esc(p.name) + (p.active ? '' : ' <span class="pill" style="color:#9a978c">yashirin</span>') + '</div>' +
+        '<div style="flex:1;min-width:0"><div style="font-weight:700;font-size:14px">' + esc(p.name) + (p.category ? ' <span class="pill" style="color:#f3d77a">' + esc(p.category) + '</span>' : '') + (p.active ? '' : ' <span class="pill" style="color:#9a978c">yashirin</span>') + '</div>' +
         '<div class="muted">' + (gm()
           ? money(p.price) + (p.old_price > 0 ? ' · yakka ' + money(p.old_price) : '') + '<br>Guruh: ' + p.joined + '/' + p.group_size + (hl === null ? '' : ' · ' + (hl <= 0 ? 'muddat tugagan' : hl + ' soat'))
           : money(p.price) + (p.old_price > p.price ? ' · eski narx ' + money(p.old_price) : '')) +
         '</div></div><span class="muted">✏️</span></div></div>';
     }).join('');
   }
+  function catSelect(cur){
+    cur = cur || '';
+    var list = S.cats.slice();
+    if (cur && list.indexOf(cur) < 0) list.push(cur);
+    return '<select id="pf_cat"><option value="">— kategoriyasiz —</option>' + list.map(function(c){ return '<option value="' + esc(c) + '"' + (c === cur ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select>';
+  }
   function openEdit(id){
-    var p = id === 'new' ? { name: '', description: '', emoji: '📦', image_url: '', price: '', old_price: '', group_size: 3, joined: 0, ends_at: null, active: true, sort: S.products.length + 1 }
+    var p = id === 'new' ? { name: '', description: '', emoji: '📦', image_url: '', price: '', old_price: '', group_size: 3, joined: 0, category: '', ends_at: null, active: true, sort: S.products.length + 1 }
       : JSON.parse(JSON.stringify(S.products.filter(function(x){ return String(x.id) === String(id); })[0] || {}));
     S.editing = p;
     var hl = p.ends_at ? Math.max(0, hoursLeft(p.ends_at)) : '';
@@ -234,6 +240,7 @@ a{color:var(--gold2)}
       '<div id="pf_pic" class="row" style="margin-bottom:10px">' + picBlock(p) + '</div>' +
       '<input type="file" id="pf_file" accept="image/*" style="display:none">' +
       '<label>Nomi</label><input id="pf_name" value="' + esc(p.name) + '">' +
+      '<label>Kategoriya</label>' + catSelect(p.category) +
       '<label>Tavsif</label><textarea id="pf_desc" rows="3">' + esc(p.description) + '</textarea>' +
       '<div class="grid2"><div><label>' + (gm() ? "Guruh narxi (so'm)" : "Narx (so'm)") + '</label><input id="pf_price" type="number" inputmode="numeric" value="' + esc(p.price) + '"></div>' +
       '<div><label>' + (gm() ? "Yakka narx (so'm)" : "Eski narx (ustiga chiziladi, ixtiyoriy)") + '</label><input id="pf_old" type="number" inputmode="numeric" value="' + esc(p.old_price) + '"></div>' +
@@ -284,7 +291,7 @@ a{color:var(--gold2)}
     var hrs = $('pf_hours').value.trim();
     var ends = p.ends_at || null;
     if (hrs === '') ends = null; else if (hrs !== p._hl0) ends = new Date(Date.now() + parseFloat(hrs) * 3600000).toISOString();
-    var row = { name: name, description: $('pf_desc').value.trim(), emoji: $('pf_emoji').value.trim() || '📦', image_url: p.image_url || '',
+    var row = { name: name, description: $('pf_desc').value.trim(), emoji: $('pf_emoji').value.trim() || '📦', category: $('pf_cat').value, image_url: p.image_url || '',
       price: price, old_price: parseFloat($('pf_old').value) || 0, group_size: Math.max(1, parseInt($('pf_gs').value, 10) || 1),
       joined: Math.max(0, parseInt($('pf_joined').value, 10) || 0), ends_at: ends, active: $('pf_active').checked, sort: parseInt($('pf_sort').value, 10) || 0 };
     var btn = $('pf_save'); btn.disabled = true; btn.textContent = 'Saqlanmoqda...';
@@ -310,6 +317,7 @@ a{color:var(--gold2)}
       '<label>Sizning Telegram username (@siz)</label><input id="tx_tg" value="' + esc(sh.admin_telegram) + '" placeholder="@username">' +
       '<label style="margin:6px 0 4px;font-size:14px;color:var(--text)"><input type="checkbox" id="tx_gm"' + (gm() ? ' checked' : '') + '> Guruh rejimi</label>' +
       '<div class="muted" style="margin-bottom:14px">' + "O'chirilsa: ilova oddiy do'kon bo'ladi, mahsulotda bitta narx ko'rinadi, guruhga qo'shilish tugmasi yo'qoladi. Banner va «Ma'lumot» matnlarini ham mosiga o'zgartiring." + '</div>' +
+      '<h2>Kategoriyalar</h2><label>Har bir qator — bitta kategoriya</label><textarea id="tx_cats" rows="5">' + esc((S.cats || []).join('\n')) + '</textarea>' +
       '<h2>"Ma\'lumot" bo\'limi</h2>' +
       '<label>Qadamlar (har bir qator — bitta qadam)</label><textarea id="tx_steps" rows="7">' + esc((inf.steps || []).join('\n')) + '</textarea>' +
       '<label>Muhim eslatma</label><textarea id="tx_note" rows="4">' + esc(inf.note) + '</textarea>' +
@@ -318,10 +326,11 @@ a{color:var(--gold2)}
   async function saveTexts(){
     var shop = { name: $('tx_name').value.trim() || 'qSHOP', tagline: $('tx_tag').value.trim(), hero_title: $('tx_ht').value.trim(), hero_text: $('tx_hx').value.trim(), admin_telegram: $('tx_tg').value.trim(), group_mode: $('tx_gm').checked };
     var info = { steps: $('tx_steps').value.split('\n').map(function(s){ return s.trim(); }).filter(Boolean), note: $('tx_note').value.trim() };
+    var cats = $('tx_cats').value.split('\n').map(function(s){ return s.trim(); }).filter(function(x, i, a){ return x && a.indexOf(x) === i; });
     var now = new Date().toISOString();
-    var r = await sb.from('settings').upsert([{ key: 'shop', value: shop, updated_at: now }, { key: 'info', value: info, updated_at: now }]);
+    var r = await sb.from('settings').upsert([{ key: 'shop', value: shop, updated_at: now }, { key: 'info', value: info, updated_at: now }, { key: 'categories', value: { list: cats }, updated_at: now }]);
     if (r.error) { toast('Xatolik: ' + errMsg(r.error)); return; }
-    S.shop = shop; S.info = info; toast('Saqlandi. Mijozlarda darrov yangilanadi');
+    S.shop = shop; S.info = info; S.cats = cats; toast('Saqlandi. Mijozlarda darrov yangilanadi');
   }
 
   /* ---------- Statistika ---------- */

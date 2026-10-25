@@ -54,6 +54,11 @@ nav button{flex:1;background:none;border:0;color:var(--muted);font-size:11px;dis
 nav button span{font-size:20px}
 nav button.on{color:var(--gold2)}
 nav .dot{position:absolute;top:0;right:26%;background:var(--red);color:#fff;font-size:10px;min-width:16px;height:16px;border-radius:8px;display:grid;place-items:center;padding:0 4px;font-style:normal}
+.chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;margin-bottom:6px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;background:var(--card);border:1px solid var(--line);color:var(--muted);border-radius:20px;padding:8px 14px;font-size:13px;font-family:inherit}
+.chip.on{background:#2a2208;border-color:var(--gold);color:var(--gold2)}
+input[type=search]{-webkit-appearance:none;appearance:none}
 .sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:40;display:none}
 .sheet-bg.show{display:block}
 .sheet{position:fixed;left:50%;bottom:0;transform:translateX(-50%);width:100%;max-width:480px;max-height:92vh;overflow:auto;
@@ -112,7 +117,7 @@ label{font-size:12px;color:var(--muted);display:block;margin:0 0 4px 2px}
   var DEFAULT_SHOP = { name: 'qSHOP', tagline: 'Xitoy tovarlari, guruh bilan arzon', hero_title: "Do'stlar bilan olsangiz — arzonroq",
     hero_text: "Mahsulotni tanlang, guruhga qo'shiling va do'stlaringizni chaqiring. Guruh to'lgach buyurtma Xitoydan yo'lga chiqadi.", admin_telegram: '' };
   var DEFAULT_INFO = { steps: [], note: '' };
-  var state = { products: [], shop: DEFAULT_SHOP, info: DEFAULT_INFO, tab: 'home', cart: [], orders: [], loaded: false };
+  var state = { products: [], shop: DEFAULT_SHOP, info: DEFAULT_INFO, categories: [], cat: '', q: '', tab: 'home', cart: [], orders: [], loaded: false };
   var sb = null;
   try { if (window.supabase && window.QSHOP && QSHOP.SUPABASE_URL) sb = window.supabase.createClient(QSHOP.SUPABASE_URL, QSHOP.SUPABASE_KEY); } catch(e){}
 
@@ -174,14 +179,20 @@ label{font-size:12px;color:var(--muted);display:block;margin:0 0 4px 2px}
   /* ---------- Ma'lumot yuklash ---------- */
   function mapRow(r){
     return { id: r.id, name: r.name, emoji: r.emoji, img: r.image_url, price: +r.price, oldPrice: +r.old_price,
-      groupSize: r.group_size, joined: r.joined, endsAt: r.ends_at, desc: r.description };
+      groupSize: r.group_size, joined: r.joined, endsAt: r.ends_at, desc: r.description || '', category: r.category || '' };
   }
   function applyData(d){
     state.products = (d.products || []).map(mapRow);
-    var shop = {}; var info = {};
-    (d.settings || []).forEach(function(s){ if (s.key === 'shop') shop = s.value || {}; if (s.key === 'info') info = s.value || {}; });
+    var shop = {}; var info = {}; var cats = [];
+    (d.settings || []).forEach(function(s){
+      if (s.key === 'shop') shop = s.value || {};
+      if (s.key === 'info') info = s.value || {};
+      if (s.key === 'categories') cats = (s.value && s.value.list) || [];
+    });
     state.shop = Object.assign({}, DEFAULT_SHOP, shop);
     state.info = Object.assign({}, DEFAULT_INFO, info);
+    state.categories = cats;
+    if (state.cat && cats.indexOf(state.cat) < 0) state.cat = '';
     state.cart = state.cart.filter(function(i){ return byId(i.id); });
     if (!groupMode()) normalizeCart();
     $('brand').innerHTML = brandHtml(state.shop.name);
@@ -221,8 +232,31 @@ label{font-size:12px;color:var(--muted);display:block;margin:0 0 4px 2px}
     var s = state.shop;
     var h = '<div class="hero"><b>' + esc(s.hero_title) + '</b><p>' + esc(s.hero_text) + '</p></div>';
     if (!state.products.length) return h + '<div class="empty"><b>🛍</b>Hozircha mahsulot yo\'q.<br>Tez orada yangilari qo\'shiladi.</div>';
-    h += '<h2>' + (groupMode() ? '🔥 Bugungi guruhlar' : '🛍 Mahsulotlar') + '</h2><div class="grid">';
-    h += state.products.map(function(p){
+    h += toolbarHtml();
+    h += '<h2>' + (groupMode() ? '🔥 Bugungi guruhlar' : '🛍 Mahsulotlar') + '</h2><div id="plist">' + listHtml() + '</div>';
+    return h;
+  }
+
+  function filtered(){
+    var q = state.q.trim().toLowerCase();
+    return state.products.filter(function(p){
+      if (state.cat && p.category !== state.cat) return false;
+      if (!q) return true;
+      return (p.name + ' ' + p.desc + ' ' + p.category).toLowerCase().indexOf(q) >= 0;
+    });
+  }
+  function toolbarHtml(){
+    var h = '<input id="s_q" type="search" placeholder="🔍 Mahsulot qidirish..." value="' + esc(state.q) + '" autocomplete="off" style="margin-bottom:10px">';
+    if (state.categories.length) {
+      h += '<div class="chips"><button class="chip ' + (state.cat === '' ? 'on' : '') + '" data-cat="">Hammasi</button>' +
+        state.categories.map(function(c){ return '<button class="chip ' + (state.cat === c ? 'on' : '') + '" data-cat="' + esc(c) + '">' + esc(c) + '</button>'; }).join('') + '</div>';
+    }
+    return h;
+  }
+  function listHtml(){
+    var items = filtered();
+    if (!items.length) return '<div class="empty"><b>🔍</b>Hech narsa topilmadi.</div>';
+    var h = '<div class="grid">' + items.map(function(p){
       var pct = Math.min(100, Math.round(p.joined / p.groupSize * 100));
       return '<div class="card" data-open="' + p.id + '"><div class="pic">' + pic(p) + (discount(p) ? '<span class="badge">-' + discount(p) + '%</span>' : '') + '</div>' +
         '<div class="info"><div class="name">' + esc(p.name) + '</div>' +
@@ -349,9 +383,10 @@ label{font-size:12px;color:var(--muted);display:block;margin:0 0 4px 2px}
   }
 
   document.addEventListener('click', function(e){
-    var t = e.target.closest('[data-tab],[data-open],[data-addg],[data-adds],[data-share],[data-inc],[data-dec],#send,#x,#x2,#bg');
+    var t = e.target.closest('[data-tab],[data-cat],[data-open],[data-addg],[data-adds],[data-share],[data-inc],[data-dec],#send,#x,#x2,#bg');
     if (!t) return;
     if (t.dataset.tab) { state.tab = t.dataset.tab; render(); if (state.tab === 'orders') refreshStatuses(); }
+    else if (t.dataset.cat !== undefined) { state.cat = t.dataset.cat; render(); }
     else if (t.dataset.open) openProduct(+t.dataset.open);
     else if (t.dataset.addg) { addToCart(+t.dataset.addg, true); closeSheet(); }
     else if (t.dataset.adds) { addToCart(+t.dataset.adds, false); closeSheet(); }
@@ -360,6 +395,13 @@ label{font-size:12px;color:var(--muted);display:block;margin:0 0 4px 2px}
     else if (t.dataset.dec != null) { var i = +t.dataset.dec; state.cart[i].qty--; if (state.cart[i].qty <= 0) state.cart.splice(i, 1); save('qs_cart', state.cart); render(); }
     else if (t.id === 'send') sendOrder();
     else if (t.id === 'x' || t.id === 'x2' || t.id === 'bg') closeSheet();
+  });
+
+  document.addEventListener('input', function(e){
+    if (e.target && e.target.id === 's_q') {
+      state.q = e.target.value;
+      var el = $('plist'); if (el) el.innerHTML = listHtml();
+    }
   });
 
   async function init(){

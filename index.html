@@ -65,6 +65,14 @@ input[type=search]{-webkit-appearance:none;appearance:none}
   background:var(--card);border-radius:22px 22px 0 0;border-top:1px solid var(--line);z-index:50;padding:0 0 20px;display:none}
 .sheet.show{display:block}
 .sheet .pic{aspect-ratio:16/10;font-size:90px;border-radius:0}
+.gal{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;aspect-ratio:16/10;background:var(--card2)}
+.gal::-webkit-scrollbar{display:none}
+.slide{flex:none;width:100%;height:100%;scroll-snap-align:center}
+.slide img{width:100%;height:100%;object-fit:cover}
+.dots{display:flex;justify-content:center;gap:6px;margin-top:8px}
+.dots i{width:7px;height:7px;border-radius:50%;background:#444}
+.dots i.on{background:var(--gold)}
+.opt{margin-bottom:10px}.optn{font-size:13px;color:var(--muted);margin-bottom:6px}
 .sheet .body{padding:14px 16px}
 .close{position:absolute;top:10px;right:10px;width:34px;height:34px;border-radius:17px;border:0;background:rgba(0,0,0,.55);color:#fff;font-size:18px;z-index:2}
 .row{display:flex;gap:10px;margin-top:12px}
@@ -156,13 +164,37 @@ label{font-size:12px;color:var(--muted);display:block;margin:0 0 4px 2px}
   function normalizeCart(){
     var m = {}, out = [];
     state.cart.forEach(function(i){
-      if (m[i.id]) m[i.id].qty += i.qty;
-      else { m[i.id] = { id: i.id, group: false, qty: i.qty }; out.push(m[i.id]); }
+      var k = i.id + '|' + (i.opt || '');
+      if (m[k]) m[k].qty += i.qty;
+      else { m[k] = { id: i.id, group: false, qty: i.qty, opt: i.opt || '' }; out.push(m[k]); }
     });
     state.cart = out; save('qs_cart', out);
   }
   function toast(t){ var el = $('toast'); el.textContent = t; el.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(function(){ el.classList.remove('show'); }, 2600); }
   function pic(p){ return p.img ? '<img src="' + esc(p.img) + '" alt="" loading="lazy">' : esc(p.emoji || '📦'); }
+  function gallery(p){
+    var imgs = [];
+    if (p.img) imgs.push(p.img);
+    (p.images || []).forEach(function(u){ if (u && imgs.indexOf(u) < 0) imgs.push(u); });
+    if (imgs.length < 2) return '<div class="pic">' + pic(p) + '</div>';
+    return '<div class="gal" id="gal">' + imgs.map(function(u){ return '<div class="slide"><img src="' + esc(u) + '" alt=""></div>'; }).join('') + '</div>' +
+      '<div class="dots" id="dots">' + imgs.map(function(u, i){ return '<i class="' + (i === 0 ? 'on' : '') + '"></i>'; }).join('') + '</div>';
+  }
+  function optHtml(p){
+    return (p.options || []).map(function(o, oi){
+      return '<div class="opt"><div class="optn">' + esc(o.name) + '</div><div class="chips" style="flex-wrap:wrap;overflow:visible">' +
+        (o.values || []).map(function(v){ return '<button class="chip" data-opt="' + oi + '" data-val="' + esc(v) + '">' + esc(v) + '</button>'; }).join('') + '</div></div>';
+    }).join('');
+  }
+  function pickedOpt(p){
+    var out = [];
+    for (var oi = 0; oi < (p.options || []).length; oi++) {
+      var el = document.querySelector('#sheet .chip.on[data-opt="' + oi + '"]');
+      if (!el) { toast(p.options[oi].name + ' tanlang'); return null; }
+      out.push(p.options[oi].name + ': ' + el.dataset.val);
+    }
+    return out.join(', ');
+  }
   function cartCount(){ return state.cart.reduce(function(s, i){ return s + i.qty; }, 0); }
   function hoursLeft(p){ return p.endsAt ? Math.ceil((new Date(p.endsAt).getTime() - Date.now()) / 3600000) : null; }
   function timeLabel(p){
@@ -179,7 +211,7 @@ label{font-size:12px;color:var(--muted);display:block;margin:0 0 4px 2px}
   /* ---------- Ma'lumot yuklash ---------- */
   function mapRow(r){
     return { id: r.id, name: r.name, emoji: r.emoji, img: r.image_url, price: +r.price, oldPrice: +r.old_price,
-      groupSize: r.group_size, joined: r.joined, endsAt: r.ends_at, desc: r.description || '', category: r.category || '' };
+      groupSize: r.group_size, joined: r.joined, endsAt: r.ends_at, desc: r.description || '', category: r.category || '', images: Array.isArray(r.images) ? r.images : [], options: Array.isArray(r.options) ? r.options : [] };
   }
   function applyData(d){
     state.products = (d.products || []).map(mapRow);
@@ -275,7 +307,7 @@ label{font-size:12px;color:var(--muted);display:block;margin:0 0 4px 2px}
       var p = byId(i.id); if (!p) return '';
       var unit = unitPrice(p, i.group);
       total += unit * i.qty;
-      return '<div class="cartrow"><div class="th">' + pic(p) + '</div><div class="c"><div>' + esc(p.name) + '</div>' +
+      return '<div class="cartrow"><div class="th">' + pic(p) + '</div><div class="c"><div>' + esc(p.name) + '</div>' + (i.opt ? '<div class="muted" style="font-size:12px">' + esc(i.opt) + '</div>' : '') +
         (groupMode() ? '<span class="tag">' + (i.group ? 'Guruh narxi' : 'Yakka narx') + '</span>' : '') + '<div style="color:var(--gold2);font-weight:700;margin-top:3px">' + money(unit) + '</div></div>' +
         '<div class="qty"><button data-dec="' + idx + '">−</button><b>' + i.qty + '</b><button data-inc="' + idx + '">+</button></div></div>';
     }).join('');
@@ -321,12 +353,12 @@ label{font-size:12px;color:var(--muted);display:block;margin:0 0 4px 2px}
   function openProduct(id){
     var p = byId(id); if (!p) return;
     var left = Math.max(0, p.groupSize - p.joined);
-    $('sheet').innerHTML = '<button class="close" id="x">✕</button><div class="pic">' + pic(p) + '</div><div class="body">' +
+    $('sheet').innerHTML = '<button class="close" id="x">✕</button>' + gallery(p) + '<div class="body">' +
       '<div style="font-size:17px;font-weight:700;line-height:1.3">' + esc(p.name) + '</div>' +
       '<div class="price" style="font-size:22px;margin-top:8px">' + money(p.price) + (p.oldPrice > p.price ? '<span class="old">' + money(p.oldPrice) + '</span>' : '') + '</div>' +
       (groupMode() ? '<div class="bar" style="margin-top:12px"><i style="width:' + Math.min(100, Math.round(p.joined / p.groupSize * 100)) + '%"></i></div>' +
       '<div class="meta" style="margin-top:6px"><span>' + (left ? "Guruh to'lishi uchun yana " + left + ' kishi kerak' : "Guruh to'ldi!") + '</span><span>' + timeLabel(p) + '</span></div>' : '') +
-      '<p class="hint" style="color:#cfc9b3;font-size:13px">' + esc(p.desc) + '</p>' +
+      '<p class="hint" style="color:#cfc9b3;font-size:13px">' + esc(p.desc) + '</p>' + optHtml(p) +
       (groupMode()
         ? '<div class="row"><button class="btn" data-addg="' + p.id + '">Guruhga qo\'shilish<br><small>' + money(p.price) + '</small></button>' +
           '<button class="btn ghost" data-adds="' + p.id + '">Yakka olish<br><small>' + money(soloPrice(p)) + '</small></button></div>'
@@ -336,9 +368,10 @@ label{font-size:12px;color:var(--muted);display:block;margin:0 0 4px 2px}
   }
   function closeSheet(){ $('bg').classList.remove('show'); $('sheet').classList.remove('show'); }
 
-  function addToCart(id, group){
-    var found = state.cart.filter(function(i){ return i.id === id && i.group === group; })[0];
-    if (found) found.qty++; else state.cart.push({ id: id, group: group, qty: 1 });
+  function addToCart(id, group, opt){
+    opt = opt || '';
+    var found = state.cart.filter(function(i){ return i.id === id && i.group === group && (i.opt || '') === opt; })[0];
+    if (found) found.qty++; else state.cart.push({ id: id, group: group, qty: 1, opt: opt });
     save('qs_cart', state.cart); renderNav(); toast("Savatga qo'shildi");
   }
 
@@ -359,12 +392,12 @@ label{font-size:12px;color:var(--muted);display:block;margin:0 0 4px 2px}
     var total = 0;
     var items = state.cart.map(function(i){
       var p = byId(i.id); var unit = unitPrice(p, i.group); total += unit * i.qty;
-      return { id: p.id, name: p.name, qty: i.qty, group: i.group, unit: unit };
+      return { id: p.id, name: p.name + (i.opt ? ' (' + i.opt + ')' : ''), qty: i.qty, group: i.group, unit: unit };
     });
     var res;
     try {
       res = await sb.rpc('place_order', { p_name: name, p_phone: phone, p_address: addr, p_note: note,
-        p_items: state.cart.map(function(i){ return { id: i.id, qty: i.qty, group: i.group }; }) });
+        p_items: state.cart.map(function(i){ return { id: i.id, qty: i.qty, group: i.group, opt: i.opt || '' }; }) });
     } catch(e){ res = { error: { message: 'Tarmoq xatosi' } }; }
     if (res.error) { btn.disabled = false; btn.textContent = 'Buyurtma yuborish'; toast('Xatolik: ' + (res.error.message || 'qayta urinib ko\'ring')); return; }
     var no = res.data;
@@ -383,13 +416,14 @@ label{font-size:12px;color:var(--muted);display:block;margin:0 0 4px 2px}
   }
 
   document.addEventListener('click', function(e){
-    var t = e.target.closest('[data-tab],[data-cat],[data-open],[data-addg],[data-adds],[data-share],[data-inc],[data-dec],#send,#x,#x2,#bg');
+    var t = e.target.closest('[data-tab],[data-cat],[data-open],[data-opt],[data-addg],[data-adds],[data-share],[data-inc],[data-dec],#send,#x,#x2,#bg');
     if (!t) return;
     if (t.dataset.tab) { state.tab = t.dataset.tab; render(); if (state.tab === 'orders') refreshStatuses(); }
     else if (t.dataset.cat !== undefined) { state.cat = t.dataset.cat; render(); }
     else if (t.dataset.open) openProduct(+t.dataset.open);
-    else if (t.dataset.addg) { addToCart(+t.dataset.addg, true); closeSheet(); }
-    else if (t.dataset.adds) { addToCart(+t.dataset.adds, false); closeSheet(); }
+    else if (t.dataset.opt !== undefined) { Array.prototype.forEach.call(document.querySelectorAll('#sheet .chip[data-opt="' + t.dataset.opt + '"]'), function(c){ c.classList.remove('on'); }); t.classList.add('on'); }
+    else if (t.dataset.addg) { var o1 = pickedOpt(byId(+t.dataset.addg)); if (o1 === null) return; addToCart(+t.dataset.addg, true, o1); closeSheet(); }
+    else if (t.dataset.adds) { var o2 = pickedOpt(byId(+t.dataset.adds)); if (o2 === null) return; addToCart(+t.dataset.adds, false, o2); closeSheet(); }
     else if (t.dataset.share) share(+t.dataset.share);
     else if (t.dataset.inc != null) { state.cart[+t.dataset.inc].qty++; save('qs_cart', state.cart); render(); }
     else if (t.dataset.dec != null) { var i = +t.dataset.dec; state.cart[i].qty--; if (state.cart[i].qty <= 0) state.cart.splice(i, 1); save('qs_cart', state.cart); render(); }
@@ -397,6 +431,11 @@ label{font-size:12px;color:var(--muted);display:block;margin:0 0 4px 2px}
     else if (t.id === 'x' || t.id === 'x2' || t.id === 'bg') closeSheet();
   });
 
+  document.addEventListener('scroll', function(e){
+    var g = e.target; if (!g || g.id !== 'gal') return;
+    var n = Math.round(g.scrollLeft / g.clientWidth), ds = document.querySelectorAll('#dots i');
+    Array.prototype.forEach.call(ds, function(d, i){ d.classList.toggle('on', i === n); });
+  }, true);
   document.addEventListener('input', function(e){
     if (e.target && e.target.id === 's_q') {
       state.q = e.target.value;

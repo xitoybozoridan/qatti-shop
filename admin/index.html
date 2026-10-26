@@ -178,7 +178,7 @@ a{color:var(--gold2)}
       var st = STATUS[o.status] || [o.status, '#9a978c'];
       var d = phoneDigits(o.phone);
       return '<div class="card"><div class="row sp"><b>#' + o.id + '</b><span class="muted">' + fmtDate(o.created_at) + '</span><span class="pill" style="color:' + st[1] + '">' + esc(st[0]) + '</span></div>' +
-        '<div class="ord">' + kv('Ism Familiya', o.customer_name) + kv('Telefon', o.phone) + kv('Manzil', o.address) + (o.note ? kv('Izoh', o.note) : '') + '</div>' +
+        '<div class="ord">' + kv('Ism Familiya', o.customer_name) + (o.customer_id ? '<div class="kv"><span>Mijoz ID:</span> <b>' + (1000 + o.customer_id) + '</b> <button class="btn small ghost" style="padding:1px 8px;font-size:12px" data-gocust="' + o.customer_id + '">kartani ochish</button></div>' : '') + kv('Telefon', o.phone) + kv('Manzil', o.address) + (o.note ? kv('Izoh', o.note) : '') + '</div>' +
         (o.items || []).map(function(i){
           var sp = splitOpt(i.name);
           return '<div class="ord item">' + kv('Mahsulot', sp.name) + sp.opts.map(function(x){ var k = x.indexOf(':'); return kv(x.slice(0, k), x.slice(k + 1).trim()); }).join('') +
@@ -429,19 +429,20 @@ a{color:var(--gold2)}
   /* ---------- Statistika ---------- */
   /* ---------- Mijozlar ---------- */
   function customers(){
-    var m = {}, out = [];
-    S.orders.forEach(function(o){
-      var k = String(o.phone || '').replace(/\D/g, '').slice(-9) || ('id' + o.id);
-      if (!m[k]) { m[k] = { key: k, name: o.customer_name, phone: o.phone, address: o.address, orders: [], sum: 0, last: o.created_at }; out.push(m[k]); }
-      var c = m[k]; c.orders.push(o);
-      if (o.status !== 'cancelled') c.sum += +o.total || 0;
-      if (o.created_at > c.last) { c.last = o.created_at; c.name = o.customer_name; c.address = o.address; c.phone = o.phone; }
-    });
+    var m = {}, out = [], byPhone = {};
     S.accts.forEach(function(a){
-      var k = String(a.phone || '').replace(/\D/g, '').slice(-9);
-      var c = m[k];
-      if (!c) { c = m[k] = { key: k, name: a.name, phone: '+' + a.phone, address: a.address, orders: [], sum: 0, last: a.created_at }; out.push(c); }
-      c.acc = a;
+      var c = m['c' + a.id] = { key: 'c' + a.id, name: a.name, phone: '+' + a.phone, address: a.address, orders: [], sum: 0, paid: 0, last: a.created_at, acc: a };
+      out.push(c); byPhone[String(a.phone).slice(-9)] = c;
+    });
+    S.orders.forEach(function(o){
+      var k9 = String(o.phone || '').replace(/\D/g, '').slice(-9) || ('id' + o.id), c;
+      if (o.customer_id && m['c' + o.customer_id]) c = m['c' + o.customer_id];
+      else if (byPhone[k9]) c = byPhone[k9];
+      else { c = m['p' + k9]; if (!c) { c = m['p' + k9] = { key: 'p' + k9, name: o.customer_name, phone: o.phone, address: o.address, orders: [], sum: 0, paid: 0, last: o.created_at }; out.push(c); } }
+      c.orders.push(o);
+      if (o.status !== 'cancelled') { var t = (+o.total || 0) + (+o.shipping || 0); c.sum += t; if (o.paid) c.paid += t; }
+      if (o.created_at > c.last) c.last = o.created_at;
+      if (!c.acc && o.created_at >= c.last) { c.name = o.customer_name; c.address = o.address; c.phone = o.phone; }
     });
     return out.sort(function(a, b){ return a.last < b.last ? 1 : -1; });
   }
@@ -464,26 +465,45 @@ a{color:var(--gold2)}
     var q = S.cq.trim().toLowerCase(), qd = q.replace(/\D/g, '');
     var list = customers().filter(function(c){
       if (!q) return true;
-      return c.name.toLowerCase().indexOf(q) >= 0 || (qd && c.phone.replace(/\D/g, '').indexOf(qd) >= 0);
+      return c.name.toLowerCase().indexOf(q) >= 0 || (qd && (c.phone.replace(/\D/g, '').indexOf(qd) >= 0 || (c.acc && String(1000 + c.acc.id) === qd)));
     });
     if (!list.length) return '<div class="empty"><b>👥</b>Mijoz topilmadi.</div>';
     return list.map(function(c){
-      var d = phoneDigits(c.phone), open = S.copen === c.key, live = c.orders.filter(function(o){ return o.status !== 'cancelled'; }).length;
+      var d = phoneDigits(c.phone), open = S.copen === c.key, a = c.acc;
       return '<div class="card"><div class="row sp" data-cust="' + esc(c.key) + '" style="cursor:pointer"><div style="min-width:0"><div style="font-weight:700">' + esc(c.name) + '</div>' +
-        '<div class="muted">📞 ' + esc(c.phone) + (c.acc ? (c.acc.blocked ? ' · <span style="color:#ff4d4f">🚫 bloklangan</span>' : ' · <span style="color:#6fcf97">✅ hisob</span>') : '') + '</div></div><div style="text-align:right"><b style="color:var(--gold2)">' + money(c.sum) + '</b><div class="muted">' + c.orders.length + ' ta buyurtma</div></div></div>' +
-        (open ? '<div class="muted" style="margin-top:8px">📍 ' + esc(c.address) + '</div>' +
-          (c.acc ? '<div class="muted" style="margin-top:4px">Ro\'yxatdan o\'tgan: ' + fmtDate(c.acc.created_at) + (c.acc.last_login ? ' · oxirgi kirish: ' + fmtDate(c.acc.last_login) : '') + '</div>' : '<div class="muted" style="margin-top:4px">Hisob ochmagan (eski buyurtma)</div>') +
+        '<div class="muted">' + (a ? '<b style="color:var(--gold2)">ID ' + (1000 + a.id) + '</b> · ' : '') + '📞 ' + esc(c.phone) + (a ? (a.blocked ? ' · <span style="color:#ff4d4f">🚫 bloklangan</span>' : ' · <span style="color:#6fcf97">✅ hisob</span>') : '') + '</div></div>' +
+        '<div style="text-align:right"><b style="color:var(--gold2)">' + money(c.sum) + '</b><div class="muted">' + c.orders.length + ' ta buyurtma</div></div></div>' +
+        (open ? '<div class="ord item">' + (a ? kv('Mijoz ID', 1000 + a.id) : kv('Hisob', 'ochmagan (eski buyurtma)')) + kv('Ism Familiya', c.name) + kv('Telefon', c.phone) + kv('Manzil', c.address || '—') +
+          (a ? kv('Ro\'yxatdan o\'tgan', fmtDate(a.created_at)) + kv('Oxirgi kirish', a.last_login ? fmtDate(a.last_login) : '—') + kv('Holat', a.blocked ? 'Bloklangan' : 'Faol') : '') +
+          kv('Buyurtmalar soni', c.orders.length) + kv('Jami xarid (yuk bilan)', money(c.sum)) + kv('To\'langan', money(c.paid)) + '</div>' +
+          '<div class="muted" style="margin:10px 0 2px">Buyurtmalar tarixi:</div>' +
           c.orders.map(function(o){ var st = STATUS[o.status] || [o.status, '#9a978c'];
-            return '<div class="kv" style="margin-top:6px;border-top:1px dashed var(--line);padding-top:6px"><b>#' + o.id + '</b> · ' + fmtDate(o.created_at) + ' · <span style="color:' + st[1] + '">' + esc(st[0]) + '</span> · ' + money(o.total) + '<br><span class="muted">' +
+            return '<div class="kv" style="margin-top:6px;border-top:1px dashed var(--line);padding-top:6px"><b>#' + o.id + '</b> · ' + fmtDate(o.created_at) + ' · <span style="color:' + st[1] + '">' + esc(st[0]) + '</span> · ' + money(o.total) + (o.paid ? ' · <span style="color:#6fcf97">to\'langan</span>' : '') + '<br><span class="muted">' +
               (o.items || []).map(function(i){ return esc(i.name) + ' × ' + esc(i.qty); }).join(', ') + '</span></div>'; }).join('') +
-          '<div class="row" style="margin-top:10px;flex-wrap:wrap"><a class="btn small ghost" href="tel:+' + d + '">📞 Qo\'ng\'iroq</a><a class="btn small ghost" target="_blank" rel="noopener" href="https://t.me/+' + d + '">✈️ Telegram</a>' + (c.acc ? '<button class="btn small ghost" data-resetpin="' + c.acc.id + '">🔑 PIN tiklash</button><button class="btn small danger" data-block="' + c.acc.id + '" data-to="' + (c.acc.blocked ? '0' : '1') + '">' + (c.acc.blocked ? 'Blokdan chiqarish' : '🚫 Bloklash') + '</button>' : '') + '</div>' : '') +
+          '<div class="row" style="margin-top:10px;flex-wrap:wrap"><a class="btn small ghost" href="tel:+' + d + '">📞 Qo\'ng\'iroq</a><a class="btn small ghost" target="_blank" rel="noopener" href="https://t.me/+' + d + '">✈️ Telegram</a>' +
+          (a ? '<button class="btn small ghost" data-custedit="' + a.id + '">✏️ Tahrirlash</button><button class="btn small ghost" data-resetpin="' + a.id + '">🔑 PIN tiklash</button><button class="btn small danger" data-block="' + a.id + '" data-to="' + (a.blocked ? '0' : '1') + '">' + (a.blocked ? 'Blokdan chiqarish' : '🚫 Bloklash') + '</button>' : '') + '</div>' : '') +
         '</div>';
     }).join('');
+  }
+  function openCustEdit(id){
+    var a = S.accts.filter(function(x){ return x.id === id; })[0]; if (!a) return;
+    $('modal').innerHTML = '<div class="in"><div class="row sp" style="margin-bottom:10px"><h2 style="margin:0">Mijoz ID ' + (1000 + a.id) + '</h2><button class="btn small ghost" data-closemodal="1">✕</button></div>' +
+      '<label>Ism Familiya</label><input id="ce_name" value="' + esc(a.name) + '">' +
+      '<label>Telefon raqam (hisob kaliti)</label><input id="ce_phone" type="tel" value="+' + esc(a.phone) + '">' +
+      '<label>Manzil</label><input id="ce_addr" value="' + esc(a.address) + '">' +
+      '<div class="muted" style="margin-bottom:12px">Raqam o\'zgarsa, mijoz yangi raqam bilan kiradi (PIN o\'sha-o\'zi qoladi).</div>' +
+      '<button class="btn" id="ce_save" data-id="' + a.id + '">Saqlash</button></div>';
+    $('modal').classList.add('show'); $('modal').scrollTop = 0;
+  }
+  async function saveCustEdit(id){
+    var r = await sb.rpc('admin_update_customer', { p_id: id, p_name: $('ce_name').value.trim(), p_address: $('ce_addr').value.trim(), p_phone: $('ce_phone').value.trim() });
+    if (r.error) { toast(errMsg(r.error)); return; }
+    await loadAccounts(); closeModal(); toast('Saqlandi'); if (S.tab === 'customers') render();
   }
   function viewCustomers(){
     var all = customers();
     var repeat = all.filter(function(c){ return c.orders.length > 1; }).length;
-    return '<input id="cu_q" type="search" placeholder="🔍 Ism yoki telefon bo\'yicha qidirish" value="' + esc(S.cq) + '" autocomplete="off">' +
+    return '<input id="cu_q" type="search" placeholder="🔍 Ism, telefon yoki ID bo\'yicha qidirish" value="' + esc(S.cq) + '" autocomplete="off">' +
       '<div class="muted" style="margin:-4px 0 10px">Jami mijoz: <b>' + all.length + '</b> · Qayta buyurtma bergan: <b>' + repeat + '</b></div><div id="clist">' + custListHtml() + '</div>';
   }
 
@@ -520,12 +540,15 @@ a{color:var(--gold2)}
 
   /* ---------- Hodisalar ---------- */
   document.addEventListener('click', async function(e){
-    var t = e.target.closest('[data-tab],[data-cust],[data-rcp],[data-resetpin],[data-block],[data-filter],[data-edit],[data-closemodal],[data-pickimg],[data-pickgal],[data-rmgal],[data-rmimg],[data-delprod],[data-delorder],#l_go,#pf_save,[data-pickgal],[data-rmgal],#cc_use,#cc_save,#tx_save,#logout,#refresh');
+    var t = e.target.closest('[data-tab],[data-cust],[data-gocust],[data-custedit],#ce_save,[data-rcp],[data-resetpin],[data-block],[data-filter],[data-edit],[data-closemodal],[data-pickimg],[data-pickgal],[data-rmgal],[data-rmimg],[data-delprod],[data-delorder],#l_go,#pf_save,[data-pickgal],[data-rmgal],#cc_use,#cc_save,#tx_save,#logout,#refresh');
     if (!t) return;
     if (t.id === 'l_go') return doLogin();
     if (t.id === 'logout') return logout();
     if (t.id === 'refresh') { await refreshAll(); render(); toast('Yangilandi'); return; }
     if (t.dataset.rcp) return showReceipt(+t.dataset.rcp);
+    if (t.dataset.gocust) { S.tab = 'customers'; S.cq = String(1000 + +t.dataset.gocust); S.copen = 'c' + t.dataset.gocust; await loadAccounts(); render(); window.scrollTo(0, 0); return; }
+    if (t.dataset.custedit) return openCustEdit(+t.dataset.custedit);
+    if (t.id === 'ce_save') return saveCustEdit(+t.dataset.id);
     if (t.dataset.resetpin) return resetPin(+t.dataset.resetpin);
     if (t.dataset.block) return toggleBlock(+t.dataset.block, t.dataset.to === '1');
     if (t.dataset.cust !== undefined) { S.copen = S.copen === t.dataset.cust ? '' : t.dataset.cust; $('clist').innerHTML = custListHtml(); return; }

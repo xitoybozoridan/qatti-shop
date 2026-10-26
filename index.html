@@ -35,6 +35,22 @@ h2{font-size:15px;margin:18px 0 10px;color:var(--gold2);letter-spacing:.3px}
 .card:active{transform:scale(.98)}
 .pic{aspect-ratio:1/1;background:var(--card2);display:grid;place-items:center;font-size:56px;position:relative;overflow:hidden}
 .pic img{width:100%;height:100%;object-fit:cover}
+.adtop{position:relative;aspect-ratio:16/9;border-radius:18px;overflow:hidden;background:var(--card2);margin-bottom:16px;border:1px solid var(--line);touch-action:pan-y}
+.adtop .sl{position:absolute;inset:0;opacity:0;transition:opacity .5s;pointer-events:none;display:block}
+.adtop .sl.on{opacity:1;pointer-events:auto}
+.adtop img,.adtop video,.adfeed img,.adfeed video,.adinfo img,.adinfo video{width:100%;height:100%;object-fit:cover;display:block}
+.adtag{position:absolute;top:8px;right:8px;background:rgba(0,0,0,.55);color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:7px;letter-spacing:.3px;z-index:2;pointer-events:none}
+.addots{position:absolute;bottom:8px;left:0;right:0;display:flex;justify-content:center;gap:5px;z-index:2;pointer-events:none}
+.addots i{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.45)}
+.addots i.on{background:var(--gold2);width:16px;border-radius:4px}
+.adfeed{text-decoration:none;color:inherit}
+.adfeed .pic{font-size:0}
+.adfeed .info{justify-content:center}
+.adfeed .cta{color:var(--gold2);font-weight:700;font-size:13px}
+.adinfo{margin-top:16px;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:var(--card);position:relative}
+.adinfo .m{position:relative;background:#000;display:block}
+.adinfo .m img,.adinfo .m video{height:auto;max-height:70vh;object-fit:contain}
+.adinfo .cta{display:block;text-align:center;padding:11px;font-weight:700;font-size:14px;color:var(--gold2);text-decoration:none}
 .badge{position:absolute;top:8px;left:8px;background:var(--red);color:#fff;font-size:11px;font-weight:700;padding:3px 7px;border-radius:8px}
 .info{padding:10px 10px 12px;display:flex;flex-direction:column;gap:6px;flex:1}
 .name{font-size:13px;line-height:1.3;min-height:34px}
@@ -137,7 +153,7 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
   var DEFAULT_SHOP = { name: 'qSHOP', tagline: 'Xitoy tovarlari, guruh bilan arzon', hero_title: "Do'stlar bilan olsangiz — arzonroq",
     hero_text: "Mahsulotni tanlang, guruhga qo'shiling va do'stlaringizni chaqiring. Guruh to'lgach buyurtma Xitoydan yo'lga chiqadi.", admin_telegram: '' };
   var DEFAULT_INFO = { steps: [], note: '' };
-  var state = { products: [], shop: DEFAULT_SHOP, info: DEFAULT_INFO, categories: [], pay: {}, rcpt: null, cat: '', q: '', tab: 'home', cart: [], orders: [], loaded: false };
+  var state = { products: [], shop: DEFAULT_SHOP, info: DEFAULT_INFO, categories: [], pay: {}, ads: {}, rcpt: null, cat: '', q: '', tab: 'home', cart: [], orders: [], loaded: false };
   var sb = null;
   try { if (window.supabase && window.QSHOP && QSHOP.SUPABASE_URL) sb = window.supabase.createClient(QSHOP.SUPABASE_URL, QSHOP.SUPABASE_KEY); } catch(e){}
 
@@ -239,16 +255,17 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
   }
   function applyData(d){
     state.products = (d.products || []).map(mapRow);
-    var shop = {}; var info = {}; var cats = []; var pay = {};
+    var shop = {}; var info = {}; var cats = []; var pay = {}; var ads = {};
     (d.settings || []).forEach(function(s){
       if (s.key === 'shop') shop = s.value || {};
       if (s.key === 'info') info = s.value || {};
       if (s.key === 'categories') cats = (s.value && s.value.list) || [];
       if (s.key === 'pay') pay = s.value || {};
+      if (s.key === 'ads') ads = s.value || {};
     });
     state.shop = Object.assign({}, DEFAULT_SHOP, shop);
     state.info = Object.assign({}, DEFAULT_INFO, info);
-    state.categories = cats; state.pay = pay;
+    state.categories = cats; state.pay = pay; state.ads = ads;
     if (state.cat && cats.indexOf(state.cat) < 0) state.cat = '';
     state.cart = state.cart.filter(function(i){ return byId(i.id); });
     if (!groupMode()) normalizeCart();
@@ -285,9 +302,105 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
     }).join('');
   }
 
+  /* ---------- Reklama ---------- */
+  function safeLink(u){
+    u = String(u || '').trim(); if (!u) return '';
+    return /^(https?:\/\/|tg:\/\/)/i.test(u) ? u : '';
+  }
+  function adList(slot){
+    var a = (state.ads && state.ads[slot]) || [];
+    return a.filter(function(x){ return x && x.on !== false && /^https?:\/\//i.test(x.url || ''); }).slice(0, slot === 'top' ? 10 : 6);
+  }
+  var adSeen = {};
+  function adHit(id, kind){
+    try {
+      if (kind === 'view') { if (adSeen[id]) return; adSeen[id] = 1; }
+      if (sb && id) { var r = sb.rpc('ad_hit', { p_ad: id, p_kind: kind }); if (r && r.then) r.then(function(){}, function(){}); }
+    } catch(e){}
+  }
+  function adMedia(a, opts){
+    opts = opts || {};
+    if (a.type === 'video')
+      return '<video src="' + esc(a.url) + '"' + (a.poster ? ' poster="' + esc(a.poster) + '"' : '') + ' muted loop playsinline webkit-playsinline preload="' + (opts.preload || 'metadata') + '"' + (opts.autoplay ? ' autoplay' : '') + (opts.controls ? ' controls controlslist="nodownload"' : '') + ' disablepictureinpicture></video>';
+    return '<img src="' + esc(a.url) + '" alt="" loading="' + (opts.lazy ? 'lazy' : 'eager') + '" decoding="async">';
+  }
+  function adWrap(a, inner, cls){
+    var l = safeLink(a.link);
+    return l ? '<a class="' + cls + '" href="' + esc(l) + '" target="_blank" rel="noopener noreferrer sponsored" data-ad="' + esc(a.id) + '">' + inner + '</a>'
+             : '<div class="' + cls + '">' + inner + '</div>';
+  }
+  function adTopHtml(){
+    var list = adList('top'); if (!list.length) return '';
+    var h = '<div class="adtop" id="adtop" data-n="' + list.length + '">' + list.map(function(a, i){
+      return adWrap(a, adMedia(a, { preload: i === 0 ? 'auto' : 'metadata' }) + '<span class="adtag">Reklama</span>', 'sl' + (i === 0 ? ' on' : '')).replace('class="sl', 'data-i="' + i + '" class="sl');
+    }).join('');
+    if (list.length > 1) h += '<div class="addots">' + list.map(function(a, i){ return '<i class="' + (i === 0 ? 'on' : '') + '"></i>'; }).join('') + '</div>';
+    return h + '</div>';
+  }
+  var adTimer = null, adIdx = 0;
+  function adShow(i){
+    var box = document.getElementById('adtop'); if (!box) return;
+    var sl = box.querySelectorAll('.sl'), dots = box.querySelectorAll('.addots i');
+    adIdx = (i + sl.length) % sl.length;
+    for (var k = 0; k < sl.length; k++) {
+      var on = k === adIdx; sl[k].classList.toggle('on', on);
+      if (dots[k]) dots[k].classList.toggle('on', on);
+      var v = sl[k].querySelector('video');
+      if (v) { if (on) { try { v.currentTime = 0; var pr = v.play(); if (pr && pr.catch) pr.catch(function(){}); } catch(e){} } else { try { v.pause(); } catch(e){} } }
+    }
+    var cur = sl[adIdx]; if (cur && cur.dataset.ad) adHit(cur.dataset.ad, 'view');
+    var nxt = sl[(adIdx + 1) % sl.length], nv = nxt && nxt.querySelector('video'); if (nv) nv.preload = 'auto';
+  }
+  function adStart(){
+    clearInterval(adTimer); adTimer = null; adIdx = 0;
+    var box = document.getElementById('adtop'); if (!box) return;
+    adShow(0);
+    if (box.dataset.n > 1) adTimer = setInterval(function(){
+      if (document.hidden || state.tab !== 'home' || !document.getElementById('adtop') || document.getElementById('adtop') !== box || adHold) return;
+      adShow(adIdx + 1);
+    }, 5000);
+  }
+  var adHold = false;
+  function adBind(){
+    // bosh sahifadan tashqari reklamalar: ko'ringanda ko'rish hisoblanadi, video o'ynaydi
+    var els = document.querySelectorAll('[data-adview]');
+    if (!els.length) return;
+    var vis = function(el, on){
+      var v = el.querySelector('video');
+      if (v) { if (on) { var pr = v.play(); if (pr && pr.catch) pr.catch(function(){}); } else v.pause(); }
+      if (on && el.dataset.adview) adHit(el.dataset.adview, 'view');
+    };
+    if ('IntersectionObserver' in window) {
+      var io = new IntersectionObserver(function(es){ es.forEach(function(e){ vis(e.target, e.isIntersecting && e.intersectionRatio >= .4); }); }, { threshold: [0, .4] });
+      els.forEach(function(el){ io.observe(el); });
+    } else els.forEach(function(el){ vis(el, true); });
+  }
+  function adFeedAfter(feed, idx, total){
+    if (!feed.length) return '';
+    var gap = 8, first = 3; // 4-mahsulotdan keyin, keyin har 8 tadan
+    var k;
+    if (total <= first) { if (idx !== total - 1) return ''; k = 0; }   // mahsulot kam bo'lsa: oxirida bitta
+    else { if (idx < first || (idx - first) % gap !== 0) return ''; k = (idx - first) / gap; }
+    if (k >= feed.length) return '';
+    var a = feed[k];
+    var inner = '<div class="pic">' + adMedia(a, { autoplay: false, lazy: true }) + '<span class="adtag">Reklama</span></div>' +
+      (safeLink(a.link) ? '<div class="info"><div class="cta">Batafsil →</div></div>' : '');
+    return adWrap(a, inner, 'card adfeed').replace('class="card adfeed"', 'class="card adfeed" data-adview="' + esc(a.id) + '"');
+  }
+  function adInfoHtml(){
+    var list = adList('info').slice(0, 3); if (!list.length) return '';
+    return list.map(function(a){
+      var l = safeLink(a.link);
+      var media = '<div class="m">' + adMedia(a, { controls: a.type === 'video', lazy: true }) + '<span class="adtag">Reklama</span></div>';
+      var body = (l && a.type !== 'video') ? '<a href="' + esc(l) + '" target="_blank" rel="noopener noreferrer sponsored" data-ad="' + esc(a.id) + '" style="display:block">' + media + '</a>' : media;
+      var cta = l ? '<a class="cta" href="' + esc(l) + '" target="_blank" rel="noopener noreferrer sponsored" data-ad="' + esc(a.id) + '">Batafsil →</a>' : '';
+      return '<div class="adinfo" data-adview="' + esc(a.id) + '">' + body + cta + '</div>';
+    }).join('');
+  }
+
   function renderHome(){
     var s = state.shop;
-    var h = '<div class="hero"><b>' + esc(s.hero_title) + '</b><p>' + esc(s.hero_text) + '</p></div>';
+    var h = adTopHtml() || '<div class="hero"><b>' + esc(s.hero_title) + '</b><p>' + esc(s.hero_text) + '</p></div>';
     if (!state.products.length) return h + '<div class="empty"><b>🛍</b>Hozircha mahsulot yo\'q.<br>Tez orada yangilari qo\'shiladi.</div>';
     h += toolbarHtml();
     h += '<h2>' + (groupMode() ? '🔥 Bugungi guruhlar' : '🛍 Mahsulotlar') + '</h2><div id="plist">' + listHtml() + '</div>';
@@ -303,7 +416,7 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
     });
   }
   function toolbarHtml(){
-    var h = '<input id="s_q" type="search" placeholder="🔍 Mahsulot qidirish..." value="' + esc(state.q) + '" autocomplete="off" style="margin-bottom:10px">';
+    var h = '<input id="s_q" type="search" placeholder="' + esc(state.shop.search_ph || '🔍 Mahsulot qidirish...') + '" value="' + esc(state.q) + '" autocomplete="off" style="margin-bottom:10px">';
     if (state.categories.length) {
       h += '<div class="chips"><button class="chip ' + (state.cat === '' ? 'on' : '') + '" data-cat="">Hammasi</button>' +
         state.categories.map(function(c){ return '<button class="chip ' + (state.cat === c ? 'on' : '') + '" data-cat="' + esc(c) + '">' + esc(c) + '</button>'; }).join('') + '</div>';
@@ -313,14 +426,15 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
   function listHtml(){
     var items = filtered();
     if (!items.length) return '<div class="empty"><b>🔍</b>Hech narsa topilmadi.</div>';
-    var h = '<div class="grid">' + items.map(function(p){
+    var feed = state.q ? [] : adList('feed');
+    var h = '<div class="grid">' + items.map(function(p, idx){
       var pct = Math.min(100, Math.round(p.joined / p.groupSize * 100));
       return '<div class="card" data-open="' + p.id + '"><div class="pic">' + pic(p) + (discount(p) ? '<span class="badge">-' + discount(p) + '%</span>' : '') + '</div>' +
         '<div class="info"><div class="name">' + esc(p.name) + '</div>' +
         '<div class="price">' + money(p.price) + (p.oldPrice > p.price ? '<span class="old">' + money(p.oldPrice) + '</span>' : '') + '</div>' +
         (groupMode() ? '<div class="bar"><i style="width:' + pct + '%"></i></div>' +
         '<div class="meta"><span>' + Math.min(p.joined, p.groupSize) + '/' + p.groupSize + ' kishi</span><span>' + timeLabel(p) + '</span></div>' : '') +
-        '</div></div>';
+        '</div></div>' + adFeedAfter(feed, idx, items.length);
     }).join('');
     return h + '</div>';
   }
@@ -524,6 +638,7 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
     if (state.info.note) h += '<h2>Muhim</h2><p class="hint" style="margin-top:0">' + esc(state.info.note) + '</p>';
     var tg = tgName();
     if (tg) h += '<a class="btn ghost" style="margin-top:14px" target="_blank" rel="noopener" href="https://t.me/' + encodeURIComponent(tg) + '">Telegramda yozish</a>';
+    h += adInfoHtml();
     return h || '<div class="empty"><b>ℹ️</b>Ma\'lumot hozircha yo\'q.</div>';
   }
   function tgName(){ return String(state.shop.admin_telegram || '').replace(/^@/, '').replace(/^https?:\/\/t\.me\//, '').trim(); }
@@ -533,6 +648,7 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
     m.innerHTML = state.tab === 'home' ? renderHome() : state.tab === 'cart' ? renderCart() : state.tab === 'orders' ? renderOrders() : state.tab === 'profile' ? renderProfile() : renderInfo();
     renderNav();
     window.scrollTo(0, 0);
+    adStart(); adBind();
   }
 
   function openProduct(id){
@@ -721,10 +837,27 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
     var n = Math.round(g.scrollLeft / g.clientWidth), ds = document.querySelectorAll('#dots i');
     Array.prototype.forEach.call(ds, function(d, i){ d.classList.toggle('on', i === n); });
   }, true);
+  document.addEventListener('click', function(e){
+    var a = e.target.closest && e.target.closest('a[data-ad]');
+    if (!a) return;
+    if (adSwiped) { e.preventDefault(); adSwiped = false; return; }
+    adHit(a.dataset.ad, 'click');
+  }, true);
+  var adSwiped = false, adX = null;
+  document.addEventListener('touchstart', function(e){
+    var b = e.target.closest && e.target.closest('#adtop'); if (!b) return;
+    adX = e.touches[0].clientX; adHold = true; adSwiped = false;
+  }, { passive: true });
+  document.addEventListener('touchend', function(e){
+    if (adX === null) return;
+    var dx = (e.changedTouches[0].clientX - adX); adX = null;
+    setTimeout(function(){ adHold = false; }, 3000);
+    if (Math.abs(dx) > 40) { adSwiped = true; adShow(adIdx + (dx < 0 ? 1 : -1)); setTimeout(function(){ adSwiped = false; }, 350); }
+  }, { passive: true });
   document.addEventListener('input', function(e){
     if (e.target && e.target.id === 's_q') {
       state.q = e.target.value;
-      var el = $('plist'); if (el) el.innerHTML = listHtml();
+      var el = $('plist'); if (el) { el.innerHTML = listHtml(); adBind(); }
     }
   });
 

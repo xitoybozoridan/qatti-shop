@@ -95,7 +95,7 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
     shipped: ["Yo'lda", '#b48cff'], arrived: ['Keldi', '#3ecf8e'], done: ['Yakunlandi', '#3ecf8e'], cancelled: ['Bekor qilindi', '#9a978c'] };
   var sb = null;
   try { sb = window.supabase.createClient(window.QSHOP.SUPABASE_URL, window.QSHOP.SUPABASE_KEY); } catch(e){}
-  var S = { tab: 'orders', orders: [], products: [], shop: {}, info: {}, cats: [], pay: {}, shown: 30, cshown: 30, cq: '', copen: '', accts: [], calc: { rate: 1750, markup: 30 }, filter: 'all', editing: null, busy: false };
+  var S = { ads: { top: [], feed: [], info: [] }, adstats: {}, _adslot: '', tab: 'orders', orders: [], products: [], shop: {}, info: {}, cats: [], pay: {}, shown: 30, cshown: 30, cq: '', copen: '', accts: [], calc: { rate: 1750, markup: 30 }, filter: 'all', editing: null, busy: false };
 
   function toast(t){ var el = $('toast'); el.textContent = t; el.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(function(){ el.classList.remove('show'); }, 2600); }
   function fmtDate(iso){ try { return new Date(iso).toLocaleString('ru', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); } catch(e){ return ''; } }
@@ -143,7 +143,8 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
   async function loadSettings(){
     var r = await sb.from('settings').select('key,value');
     if (r.error) throw r.error;
-    (r.data || []).forEach(function(x){ if (x.key === 'shop') S.shop = x.value || {}; if (x.key === 'info') S.info = x.value || {}; if (x.key === 'calc' && x.value) S.calc = { rate: +x.value.rate || 1750, markup: x.value.markup === undefined ? 30 : +x.value.markup }; if (x.key === 'pay') S.pay = x.value || {}; if (x.key === 'categories') S.cats = (x.value && x.value.list) || []; });
+    loadAdStats();
+    (r.data || []).forEach(function(x){ if (x.key === 'shop') S.shop = x.value || {}; if (x.key === 'info') S.info = x.value || {}; if (x.key === 'calc' && x.value) S.calc = { rate: +x.value.rate || 1750, markup: x.value.markup === undefined ? 30 : +x.value.markup }; if (x.key === 'pay') S.pay = x.value || {}; if (x.key === 'ads') S.ads = normAds(x.value); if (x.key === 'categories') S.cats = (x.value && x.value.list) || []; });
   }
   function sig(){ return S.orders.length + ':' + S.orders.map(function(o){ return o.id + o.status + (o.paid ? 1 : 0) + (+o.shipping || 0) + (o.receipt_thumb ? 1 : 0); }).join(',').length + ':' + (S.orders[0] ? S.orders[0].id : 0); }
   async function refreshTab(tab){
@@ -405,13 +406,142 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
   }
 
   /* ---------- Matnlar ---------- */
+  /* ---------- Reklama ---------- */
+  var AD_SLOTS = [
+    { k: 'top', name: '1) Bosh sahifa tepasi', max: 10, vid: 5, hint: 'Aylanib turadi (har 5 soniyada). Rasm yoki 5 soniyagacha video. Tavsiya: 16:9 (masalan 1280×720).' },
+    { k: 'feed', name: '2) Mahsulotlar orasida', max: 6, vid: 10, hint: 'Mahsulot kartochkasi kabi chiqadi (4-mahsulotdan keyin, so\'ng har 8 tadan). Kvadrat rasm yaxshi. Video 10 soniyagacha.' },
+    { k: 'info', name: '3) «Ma\'lumot» pastida', max: 3, vid: 30, hint: 'Telegram tugmasi tagida. Rasm yoki 30 soniyagacha video (sifati o\'zgarmaydi).' }
+  ];
+  function normAds(v){
+    v = v || {}; var o = {};
+    AD_SLOTS.forEach(function(sl){ o[sl.k] = Array.isArray(v[sl.k]) ? v[sl.k] : []; });
+    return o;
+  }
+  function normLink(u){
+    u = String(u || '').trim(); if (!u) return '';
+    if (/^(https?:\/\/|tg:\/\/)/i.test(u)) return u;
+    if (/^@[A-Za-z0-9_]{4,}$/.test(u)) return 'https://t.me/' + u.slice(1);
+    if (/^[a-z0-9][a-z0-9.\-]*\.[a-z]{2,}(\/\S*)?$/i.test(u)) return 'https://' + u;
+    return null;
+  }
+  async function loadAdStats(){
+    try { var r = await sb.from('ad_stats').select('*'); S.adstats = {}; (r.data || []).forEach(function(x){ S.adstats[x.ad_id] = x; }); } catch(e){}
+  }
+  function adsHtml(){
+    var ads = S.ads || normAds();
+    return AD_SLOTS.map(function(sl){
+      var list = ads[sl.k] || [];
+      return '<div class="card"><div style="font-weight:700;margin-bottom:2px">' + esc(sl.name) + ' <span class="muted">(' + list.length + '/' + sl.max + ')</span></div>' +
+        '<div class="muted" style="margin-bottom:8px">' + esc(sl.hint) + '</div>' +
+        list.map(function(a, i){
+          var st = (S.adstats || {})[a.id];
+          var media = a.type === 'video'
+            ? '<video src="' + esc(a.url) + '"' + (a.poster ? ' poster="' + esc(a.poster) + '"' : '') + ' muted playsinline preload="metadata" style="width:84px;height:60px;object-fit:cover;border-radius:8px;background:#000"></video>'
+            : '<img src="' + esc(a.url) + '" style="width:84px;height:60px;object-fit:cover;border-radius:8px">';
+          return '<div style="border-top:1px solid var(--line);padding:10px 0"><div style="display:flex;gap:10px;align-items:center">' + media +
+            '<div style="flex:1;min-width:0"><div class="muted">' + (a.type === 'video' ? '🎬 Video' : '🖼 Rasm') + (a.dur ? ' · ' + a.dur + ' s' : '') + (st ? ' · 👁 ' + st.views + ' · 👆 ' + st.clicks : '') + '</div>' +
+            '<label style="display:block;margin-top:4px;font-size:13px"><input type="checkbox" data-adtog="' + sl.k + ':' + i + '"' + (a.on !== false ? ' checked' : '') + '> Ko\'rsatilsin</label></div></div>' +
+            '<input data-adlink="' + sl.k + ':' + i + '" value="' + esc(a.link || '') + '" placeholder="Havola: sayt, t.me/..., instagram.com/..., ilova" style="margin-top:8px" inputmode="url" autocapitalize="off">' +
+            '<div style="display:flex;gap:6px;margin-top:6px"><button class="btn small ghost" data-admv="' + sl.k + ':' + i + ':-1">↑</button><button class="btn small ghost" data-admv="' + sl.k + ':' + i + ':1">↓</button><button class="btn small danger" data-addel="' + sl.k + ':' + i + '">O\'chirish</button></div></div>';
+        }).join('') +
+        (list.length < sl.max ? '<button class="btn small" style="margin-top:8px" data-adadd="' + sl.k + '">+ Rasm / video qo\'shish</button>' : '') + '</div>';
+    }).join('') +
+    '<input type="file" id="ad_file" accept="image/*,video/mp4,video/webm,video/quicktime" style="display:none">' +
+    '<button class="btn" id="ad_save" style="margin-bottom:6px">Reklamani saqlash</button><div class="muted" style="margin-bottom:14px">O\'zgartirgach «Reklamani saqlash» ni bosing. Yuklangan fayl sifati o\'zgartirilmaydi (juda katta rasm 2400px gacha kichraytiriladi).</div>';
+  }
+  function adsRender(){ var b = $('adbox'); if (b) b.innerHTML = adsHtml(); }
+  function mediaInfo(file){
+    return new Promise(function(resolve, reject){
+      var url = URL.createObjectURL(file), v = document.createElement('video');
+      v.preload = 'metadata'; v.muted = true; v.playsInline = true;
+      var done = false, to = setTimeout(function(){ if (!done) { done = true; URL.revokeObjectURL(url); reject(new Error('Video ochilmadi (mp4 formatda yuklang)')); } }, 15000);
+      v.onloadedmetadata = function(){
+        if (done) return;
+        var dur = v.duration, w = v.videoWidth, h = v.videoHeight;
+        // poster: 0.1 soniyadagi kadr
+        var finish = function(poster){ if (done) return; done = true; clearTimeout(to); URL.revokeObjectURL(url); resolve({ dur: dur, w: w, h: h, poster: poster }); };
+        v.onseeked = function(){ try { var c = document.createElement('canvas'); c.width = w; c.height = h; c.getContext('2d').drawImage(v, 0, 0, w, h); c.toBlob(function(b){ finish(b); }, 'image/jpeg', 0.88); } catch(e){ finish(null); } };
+        v.onerror = function(){ finish(null); };
+        try { v.currentTime = Math.min(0.1, dur / 2); } catch(e){ finish(null); }
+        setTimeout(function(){ finish(null); }, 4000);
+      };
+      v.onerror = function(){ if (done) return; done = true; clearTimeout(to); URL.revokeObjectURL(url); reject(new Error('Video ochilmadi (mp4 formatda yuklang)')); };
+      v.src = url;
+    });
+  }
+  async function bigImage(file){
+    // sifat saqlanadi: kichik/o'rta rasm o'zgarishsiz; juda kattasi 2400px gacha kichraytiriladi
+    var url = URL.createObjectURL(file);
+    try {
+      var dim = await new Promise(function(res, rej){ var i = new Image(); i.onload = function(){ res([i.naturalWidth, i.naturalHeight, i]); }; i.onerror = function(){ rej(new Error('Rasm ochilmadi')); }; i.src = url; });
+      var w = dim[0], h = dim[1];
+      if (Math.max(w, h) <= 2400 && file.size <= 6 * 1024 * 1024 && /^image\/(jpeg|png|webp|gif)$/.test(file.type)) return { blob: file, type: file.type };
+      var k = Math.min(1, 2400 / Math.max(w, h)), c = document.createElement('canvas');
+      c.width = Math.round(w * k); c.height = Math.round(h * k); c.getContext('2d').drawImage(dim[2], 0, 0, c.width, c.height);
+      var b = await new Promise(function(r){ c.toBlob(r, 'image/jpeg', 0.92); });
+      if (!b) throw new Error('Rasmni qayta ishlab bo\'lmadi');
+      return { blob: b, type: 'image/jpeg' };
+    } finally { URL.revokeObjectURL(url); }
+  }
+  function extOf(type, name){
+    var m = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif', 'video/mp4': 'mp4', 'video/webm': 'webm', 'video/quicktime': 'mov' };
+    return m[type] || (String(name).split('.').pop() || 'bin').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 5);
+  }
+  async function putAd(blob, type, slot, name){
+    var path = 'ads/' + slot + '-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7) + '.' + extOf(type, name);
+    var r = await sb.storage.from('product-images').upload(path, blob, { contentType: type, upsert: false, cacheControl: '31536000' });
+    if (r.error) throw r.error;
+    return sb.storage.from('product-images').getPublicUrl(path).data.publicUrl;
+  }
+  async function adUpload(file, slot){
+    var sl = AD_SLOTS.filter(function(x){ return x.k === slot; })[0];
+    var isVid = /^video\//.test(file.type) || /\.(mp4|mov|webm)$/i.test(file.name);
+    var btn = document.querySelector('[data-adadd="' + slot + '"]'); if (btn) { btn.disabled = true; btn.textContent = 'Yuklanmoqda...'; }
+    try {
+      if (S.ads[slot].length >= sl.max) throw new Error('Bu joyga ko\'pi bilan ' + sl.max + ' ta');
+      var item = { id: 'a' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), on: true, link: '' };
+      if (isVid) {
+        if (file.size > 50 * 1024 * 1024) throw new Error('Video 50 MB dan katta. Kichikroq qiling');
+        var mi = await mediaInfo(file);
+        if (mi.dur > sl.vid + 0.4) throw new Error('Video ' + Math.round(mi.dur) + ' soniya. Bu joy uchun ko\'pi bilan ' + sl.vid + ' soniya');
+        var vt = file.type || (/\.webm$/i.test(file.name) ? 'video/webm' : /\.mov$/i.test(file.name) ? 'video/quicktime' : 'video/mp4');
+        item.type = 'video'; item.url = await putAd(file, vt, slot, file.name); item.dur = Math.round(mi.dur * 10) / 10;
+        if (mi.poster) { try { item.poster = await putAd(mi.poster, 'image/jpeg', slot + '-p', 'p.jpg'); } catch(e){} }
+      } else {
+        if (!/^image\//.test(file.type)) throw new Error('Faqat rasm yoki video');
+        var im = await bigImage(file);
+        item.type = 'image'; item.url = await putAd(im.blob, im.type, slot, file.name);
+      }
+      S.ads[slot].push(item); adsRender(); toast('Yuklandi. Havola yozing va «Reklamani saqlash» ni bosing');
+    } catch(e){ adsRender(); toast('Yuklanmadi: ' + (e && e.message ? errMsg(e) : e)); }
+  }
+  async function adSave(){
+    var bad = null;
+    document.querySelectorAll('[data-adlink]').forEach(function(inp){ var q = inp.dataset.adlink.split(':'); if (S.ads[q[0]] && S.ads[q[0]][+q[1]]) S.ads[q[0]][+q[1]].link = inp.value.trim(); });
+    AD_SLOTS.forEach(function(sl){ S.ads[sl.k].forEach(function(a){ if (a.link) { var n = normLink(a.link); if (n === null) bad = a.link; else a.link = n; } }); });
+    if (bad) { adsRender(); toast('Havola noto\'g\'ri: ' + bad); return; }
+    var r = await sb.from('settings').upsert([{ key: 'ads', value: S.ads, updated_at: new Date().toISOString() }]);
+    if (r.error) { toast('Xatolik: ' + errMsg(r.error)); return; }
+    adsRender(); toast('Reklama saqlandi. Mijozlarda darrov yangilanadi');
+  }
+  function adAction(t){
+    var parts;
+    if (t.dataset.adadd) { S._adslot = t.dataset.adadd; $('ad_file').click(); return; }
+    if (t.id === 'ad_save') return adSave();
+    if (t.dataset.addel) { parts = t.dataset.addel.split(':'); if (!confirm('Reklama o\'chirilsinmi?')) return; S.ads[parts[0]].splice(+parts[1], 1); adsRender(); toast('O\'chirildi. «Reklamani saqlash» ni bosing'); return; }
+    if (t.dataset.admv) { parts = t.dataset.admv.split(':'); var a = S.ads[parts[0]], i = +parts[1], j = i + +parts[2]; if (j < 0 || j >= a.length) return; var x = a[i]; a[i] = a[j]; a[j] = x; adsRender(); return; }
+  }
+
+  /* ---------- Matnlar ---------- */
   function viewTexts(){
     var sh = S.shop || {}, inf = S.info || {};
-    return '<h2 style="margin-top:4px">Asosiy sahifa</h2>' +
+    return '<h2 style="margin-top:4px">📢 Reklama</h2><div id="adbox">' + adsHtml() + '</div>' +
+      '<h2>Asosiy sahifa</h2>' +
       '<label>Do\'kon nomi</label><input id="tx_name" value="' + esc(sh.name) + '">' +
       '<label>Sarlavha ostidagi qisqa matn</label><input id="tx_tag" value="' + esc(sh.tagline) + '">' +
       '<label>Katta banner sarlavhasi</label><input id="tx_ht" value="' + esc(sh.hero_title) + '">' +
       '<label>Banner matni</label><textarea id="tx_hx" rows="3">' + esc(sh.hero_text) + '</textarea>' +
+      '<label>Qidiruv maydonidagi yozuv</label><input id="tx_sph" value="' + esc(sh.search_ph || '') + '" placeholder="🔍 Mahsulot qidirish...">' +
       '<label>Sizning Telegram username (@siz)</label><input id="tx_tg" value="' + esc(sh.admin_telegram) + '" placeholder="@username">' +
       '<label style="margin:6px 0 4px;font-size:14px;color:var(--text)"><input type="checkbox" id="tx_gm"' + (gm() ? ' checked' : '') + '> Guruh rejimi</label>' +
       '<div class="muted" style="margin-bottom:14px">' + "O'chirilsa: ilova oddiy do'kon bo'ladi, mahsulotda bitta narx ko'rinadi, guruhga qo'shilish tugmasi yo'qoladi. Banner va «Ma'lumot» matnlarini ham mosiga o'zgartiring." + '</div>' +
@@ -425,10 +555,10 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
       '<label>Qadamlar (har bir qator — bitta qadam)</label><textarea id="tx_steps" rows="7">' + esc((inf.steps || []).join('\n')) + '</textarea>' +
       '<label>Muhim eslatma</label><textarea id="tx_note" rows="4">' + esc(inf.note) + '</textarea>' +
       '<button class="btn" id="tx_save">Saqlash</button>' +
-      '<div class="muted" style="text-align:center;margin:22px 0 8px;font-size:12px">Admin ilova versiyasi: 2026.10.26-b (tezlashtirilgan)</div>';
+      '<div class="muted" style="text-align:center;margin:22px 0 8px;font-size:12px">Admin ilova versiyasi: 2026.10.26-c (reklama)</div>';
   }
   async function saveTexts(){
-    var shop = { name: $('tx_name').value.trim() || 'qSHOP', tagline: $('tx_tag').value.trim(), hero_title: $('tx_ht').value.trim(), hero_text: $('tx_hx').value.trim(), admin_telegram: $('tx_tg').value.trim(), group_mode: $('tx_gm').checked };
+    var shop = { name: $('tx_name').value.trim() || 'qSHOP', tagline: $('tx_tag').value.trim(), hero_title: $('tx_ht').value.trim(), hero_text: $('tx_hx').value.trim(), admin_telegram: $('tx_tg').value.trim(), search_ph: $('tx_sph').value.trim(), group_mode: $('tx_gm').checked };
     var info = { steps: $('tx_steps').value.split('\n').map(function(s){ return s.trim(); }).filter(Boolean), note: $('tx_note').value.trim() };
     var cats = $('tx_cats').value.split('\n').map(function(s){ return s.trim(); }).filter(function(x, i, a){ return x && a.indexOf(x) === i; });
     var pay = { card: $('tx_card').value.trim(), holder: $('tx_holder').value.trim(), note: $('tx_paynote').value.trim(), required: $('tx_payreq').checked };
@@ -553,7 +683,7 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
 
   /* ---------- Hodisalar ---------- */
   document.addEventListener('click', async function(e){
-    var t = e.target.closest('[data-tab],[data-cust],[data-more],[data-gocust],[data-custedit],#ce_save,[data-rcp],[data-resetpin],[data-block],[data-filter],[data-edit],[data-closemodal],[data-pickimg],[data-pickgal],[data-rmgal],[data-rmimg],[data-delprod],[data-delorder],#l_go,#pf_save,[data-pickgal],[data-rmgal],#cc_use,#cc_save,#tx_save,#logout,#refresh');
+    var t = e.target.closest('[data-adadd],[data-addel],[data-admv],#ad_save,[data-tab],[data-cust],[data-more],[data-gocust],[data-custedit],#ce_save,[data-rcp],[data-resetpin],[data-block],[data-filter],[data-edit],[data-closemodal],[data-pickimg],[data-pickgal],[data-rmgal],[data-rmimg],[data-delprod],[data-delorder],#l_go,#pf_save,[data-pickgal],[data-rmgal],#cc_use,#cc_save,#tx_save,#logout,#refresh');
     if (!t) return;
     if (t.id === 'l_go') return doLogin();
     if (t.id === 'logout') return logout();
@@ -580,11 +710,15 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
     if (t.id === 'cc_use') { var c = calcVals(); if (c.sell > 0) { $('pf_price').value = c.sell; toast('Narx qo\'yildi'); } else toast('Avval ¥ narxini kiriting'); return; }
     if (t.id === 'cc_save') return calcSave();
     if (t.id === 'tx_save') return saveTexts();
+    if (t.dataset.adadd || t.dataset.addel || t.dataset.admv || t.id === 'ad_save') return adAction(t);
   });
   document.addEventListener('keydown', function(e){ if (e.key === 'Enter' && e.target && (e.target.id === 'l_pass' || e.target.id === 'l_email')) doLogin(); });
   document.addEventListener('input', function(e){ if (e.target && e.target.id === 'cu_q') { S.cq = e.target.value; $('clist').innerHTML = custListHtml(); return; }  if (e.target && /^cc_/.test(e.target.id)) calcUpdate(); });
   document.addEventListener('change', function(e){
     var t = e.target;
+    if (t.id === 'ad_file') { var f = t.files && t.files[0]; t.value = ''; if (f && S._adslot) adUpload(f, S._adslot); return; }
+    if (t.dataset && t.dataset.adtog) { var q = t.dataset.adtog.split(':'); S.ads[q[0]][+q[1]].on = t.checked; return; }
+    if (t.dataset && t.dataset.adlink) { var q2 = t.dataset.adlink.split(':'), nl = normLink(t.value); if (nl === null) { toast('Havola noto\'g\'ri. Masalan: t.me/kanal yoki https://sayt.uz'); S.ads[q2[0]][+q2[1]].link = t.value.trim(); return; } t.value = nl; S.ads[q2[0]][+q2[1]].link = nl; return; }
     if (t.dataset && t.dataset.status) return setStatus(+t.dataset.status, t.value);
     if (t.dataset && t.dataset.paid) return setPaid(+t.dataset.paid, t.checked);
     if (t.dataset && t.dataset.ship) return saveShipping(+t.dataset.ship, t.value);

@@ -492,12 +492,23 @@ label{font-size:12px;color:var(--muted);display:block;margin:0 0 4px 2px}
         '<p class="hint">PIN esdan chiqdimi? ' + (tg ? '<a style="color:var(--gold2)" target="_blank" rel="noopener" href="https://t.me/' + encodeURIComponent(tg) + '">Telegramda yozing</a>, yangi PIN beramiz.' : 'Admin bilan bog\'laning, yangi PIN beradi.') + '</p>';
     }
     var m = state.me, cnt = state.orders.filter(function(o){ return o.server; }).length;
-    return '<div class="card" style="padding:16px;display:flex;gap:14px;align-items:center;margin-bottom:14px"><div style="width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,var(--gold2),var(--gold));color:#1a1405;display:grid;place-items:center;font-size:22px;font-weight:800">' + esc((m.name || '?').charAt(0).toUpperCase()) + '</div>' +
-      '<div><div style="font-weight:800;font-size:16px">' + esc(m.name) + '</div><div class="muted" style="font-size:13px">' + esc(fmtPhone(m.phone)) + '</div><div class="muted" style="font-size:12px">Buyurtmalar: ' + cnt + '</div></div></div>' +
+    var live = state.orders.filter(function(o){ return o.server && state.statuses[o.no] !== 'cancelled'; });
+    var spent = live.reduce(function(a, o){ return a + (+o.total || 0) + (+(state.ship || {})[o.no] || 0); }, 0);
+    var paidSum = live.filter(function(o){ return o.paid; }).reduce(function(a, o){ return a + (+o.total || 0) + (+(state.ship || {})[o.no] || 0); }, 0);
+    var cid = 1000 + (+m.id || 0), tg2 = tgName();
+    var phoneMsg = 'Salom! Mening ID: ' + cid + ', ism: ' + m.name + ', hozirgi raqamim: ' + fmtPhone(m.phone) + '. Raqamimni yangisiga o\'zgartirib bering: +998';
+    return '<div class="card" style="padding:16px;flex-direction:row;gap:14px;align-items:center;margin-bottom:10px;cursor:default"><div style="flex:none;width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,var(--gold2),var(--gold));color:#1a1405;display:grid;place-items:center;font-size:24px;font-weight:800">' + esc((m.name || '?').charAt(0).toUpperCase()) + '</div>' +
+      '<div style="min-width:0"><div style="font-weight:800;font-size:17px">' + esc(m.name) + '</div><div class="muted" style="font-size:13px">' + esc(fmtPhone(m.phone)) + '</div>' +
+      '<div style="margin-top:4px"><span class="tag" style="font-size:12px">ID: ' + cid + '</span> <button class="btn small ghost" style="padding:2px 10px;font-size:12px" data-copy="' + cid + '">Nusxalash</button></div></div></div>' +
+      '<div class="row" style="gap:8px;margin-bottom:6px"><div class="card" style="flex:1;padding:10px;text-align:center;cursor:default"><b style="font-size:18px">' + state.orders.filter(function(o){ return o.server; }).length + '</b><div class="muted" style="font-size:11px">Buyurtma</div></div>' +
+      '<div class="card" style="flex:1;padding:10px;text-align:center;cursor:default"><b style="font-size:14px;color:var(--gold2)">' + money(spent) + '</b><div class="muted" style="font-size:11px">Jami xarid</div></div>' +
+      '<div class="card" style="flex:1;padding:10px;text-align:center;cursor:default"><b style="font-size:14px;color:#6fcf97">' + money(paidSum) + '</b><div class="muted" style="font-size:11px">To\'langan</div></div></div>' +
+      '<div class="muted" style="font-size:12px;margin-bottom:6px">ID raqamingizni admin so\'rasa, shuni ayting — hisobingizni tez topadi.</div>' +
       '<h2>Mening ma\'lumotlarim</h2>' +
       '<label>Ism Familiya</label><input id="a_name" autocomplete="name" value="' + esc(m.name) + '">' +
       '<label>Manzil</label><input id="a_addr" autocomplete="street-address" value="' + esc(m.address) + '">' +
-      '<div class="muted" style="margin:-4px 0 10px;font-size:12px">Telefon raqamni o\'zgartirish uchun admin bilan bog\'laning.</div>' +
+      '<div class="muted" style="margin:-4px 0 10px;font-size:12px">Telefon raqam hisobingizning kaliti. Uni o\'zgartirish uchun adminga so\'rov yuboring.</div>' +
+      (tg2 ? '<a class="btn ghost" style="margin-bottom:10px" target="_blank" rel="noopener" href="https://t.me/' + encodeURIComponent(tg2) + '?text=' + encodeURIComponent(phoneMsg) + '">📞 Raqamni o\'zgartirish so\'rovi</a>' : '') +
       '<button class="btn" id="p_save">Saqlash</button>' +
       '<h2 style="margin-top:22px">PIN ni o\'zgartirish</h2>' +
       '<label>Eski PIN</label><input id="a_old" type="password" inputmode="numeric" maxlength="6" autocomplete="current-password">' +
@@ -692,7 +703,7 @@ label{font-size:12px;color:var(--muted);display:block;margin:0 0 4px 2px}
   });
   document.addEventListener('click', async function(e){
     var t = e.target.closest('[data-copy],[data-rview],[data-rmrc],[data-rord],[data-attach],[data-dlall],#lbd'); if (!t) return;
-    if (t.dataset.copy) { try { await navigator.clipboard.writeText(t.dataset.copy); toast('Karta raqami nusxalandi'); } catch(x){ toast('Nusxalab bo\'lmadi. Raqamni qo\'lda belgilang'); } }
+    if (t.dataset.copy) { try { await navigator.clipboard.writeText(t.dataset.copy); toast('Nusxalandi'); } catch(x){ toast('Nusxalab bo\'lmadi. Raqamni qo\'lda belgilang'); } }
     else if (t.dataset.rview) { if (state.rcpt) showImgs([state.rcpt.full], 0, false); }
     else if (t.dataset.rmrc) { state.rcpt = null; var bx = $('rcpt_box'); if (bx) bx.innerHTML = rcptBoxHtml(); }
     else if (t.dataset.rord) {

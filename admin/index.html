@@ -408,9 +408,9 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
   /* ---------- Matnlar ---------- */
   /* ---------- Reklama ---------- */
   var AD_SLOTS = [
-    { k: 'top', name: '1) Bosh sahifa tepasi', max: 10, vid: 5, hint: 'Aylanib turadi (har 5 soniyada). Rasm yoki 5 soniyagacha video. Tavsiya: 16:9 (masalan 1280×720).' },
-    { k: 'feed', name: '2) Mahsulotlar orasida', max: 6, vid: 10, hint: 'Mahsulot kartochkasi kabi chiqadi (4-mahsulotdan keyin, so\'ng har 8 tadan). Kvadrat rasm yaxshi. Video 10 soniyagacha.' },
-    { k: 'info', name: '3) «Ma\'lumot» pastida', max: 3, vid: 30, hint: 'Telegram tugmasi tagida. Rasm yoki 30 soniyagacha video (sifati o\'zgarmaydi).' }
+    { k: 'top', name: '1) Bosh sahifa tepasi', max: 10, vid: 5, hint: 'Aylanib turadi (har 3 soniyada, video bo\'lsa uning uzunligicha). Rasm o\'lchami: 1200×500 piksel (keng, 12:5) — shunda to\'liq to\'ldiradi. Video ham shu nisbatda, 5 soniyagacha.' },
+    { k: 'feed', name: '2) Mahsulotlar orasida', max: 6, vid: 10, hint: 'Mahsulot kartochkasi kabi chiqadi (4-mahsulotdan keyin, so\'ng har 8 tadan). Rasm o\'lchami: 800×800 piksel (kvadrat). Video 10 soniyagacha.' },
+    { k: 'info', name: '3) «Ma\'lumot» pastida', max: 3, vid: 30, hint: 'Telegram tugmasi tagida. Rasm yoki 30 soniyagacha video (sifati o\'zgarmaydi). Rasm to\'liq ko\'rinadi, istalgan o\'lcham bo\'ladi.' }
   ];
   function normAds(v){
     v = v || {}; var o = {};
@@ -429,7 +429,7 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
   }
   function adsHtml(){
     var ads = S.ads || normAds();
-    return AD_SLOTS.map(function(sl){
+    return (S._adst ? '<div class="card" style="border-color:' + (S._adst.err ? 'var(--red)' : 'var(--gold)') + ';font-size:13px">' + (S._adst.err ? '❌ ' : '⏳ ') + esc(S._adst.msg) + '</div>' : '') + AD_SLOTS.map(function(sl){
       var list = ads[sl.k] || [];
       return '<div class="card"><div style="font-weight:700;margin-bottom:2px">' + esc(sl.name) + ' <span class="muted">(' + list.length + '/' + sl.max + ')</span></div>' +
         '<div class="muted" style="margin-bottom:8px">' + esc(sl.hint) + '</div>' +
@@ -496,7 +496,7 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
   async function adUpload(file, slot){
     var sl = AD_SLOTS.filter(function(x){ return x.k === slot; })[0];
     var isVid = /^video\//.test(file.type) || /\.(mp4|mov|webm)$/i.test(file.name);
-    var btn = document.querySelector('[data-adadd="' + slot + '"]'); if (btn) { btn.disabled = true; btn.textContent = 'Yuklanmoqda...'; }
+    S._adst = { msg: 'Yuklanmoqda: ' + (file.name || '') + ' (' + (file.size / 1048576).toFixed(1) + ' MB, ' + (file.type || 'turi noma\'lum') + ')...' }; adsRender();
     try {
       if (S.ads[slot].length >= sl.max) throw new Error('Bu joyga ko\'pi bilan ' + sl.max + ' ta');
       var item = { id: 'a' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), on: true, link: '' };
@@ -512,8 +512,8 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
         var im = await bigImage(file);
         item.type = 'image'; item.url = await putAd(im.blob, im.type, slot, file.name);
       }
-      S.ads[slot].push(item); adsRender(); toast('Yuklandi. Havola yozing va «Reklamani saqlash» ni bosing');
-    } catch(e){ adsRender(); toast('Yuklanmadi: ' + (e && e.message ? errMsg(e) : e)); }
+      S.ads[slot].push(item); S._adst = null; adsRender(); toast('Yuklandi. Havola yozing va «Reklamani saqlash» ni bosing');
+    } catch(e){ var em = (e && e.message ? errMsg(e) : String(e)); S._adst = { err: true, msg: 'Yuklanmadi: ' + em + ' [' + (file.name || '') + ', ' + (file.size / 1048576).toFixed(1) + ' MB, ' + (file.type || '?') + ']' }; adsRender(); toast('Yuklanmadi: ' + em); }
   }
   async function adSave(){
     var bad = null;

@@ -424,7 +424,8 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
       '<h2>"Ma\'lumot" bo\'limi</h2>' +
       '<label>Qadamlar (har bir qator — bitta qadam)</label><textarea id="tx_steps" rows="7">' + esc((inf.steps || []).join('\n')) + '</textarea>' +
       '<label>Muhim eslatma</label><textarea id="tx_note" rows="4">' + esc(inf.note) + '</textarea>' +
-      '<button class="btn" id="tx_save">Saqlash</button>';
+      '<button class="btn" id="tx_save">Saqlash</button>' +
+      '<div class="muted" style="text-align:center;margin:22px 0 8px;font-size:12px">Admin ilova versiyasi: 2026.10.26-b (tezlashtirilgan)</div>';
   }
   async function saveTexts(){
     var shop = { name: $('tx_name').value.trim() || 'qSHOP', tagline: $('tx_tag').value.trim(), hero_title: $('tx_ht').value.trim(), hero_text: $('tx_hx').value.trim(), admin_telegram: $('tx_tg').value.trim(), group_mode: $('tx_gm').checked };

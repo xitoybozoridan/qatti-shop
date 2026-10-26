@@ -15,7 +15,7 @@
 html,body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 body{min-height:100vh;display:flex;justify-content:center}
 #app{width:100%;max-width:560px;min-height:100vh;padding-bottom:84px}
-header{position:sticky;top:0;z-index:20;background:rgba(14,14,16,.94);backdrop-filter:blur(10px);padding:calc(env(safe-area-inset-top) + 12px) 16px 12px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
+header{position:sticky;top:0;z-index:20;background:rgba(14,14,16,.94);padding:calc(env(safe-area-inset-top) + 12px) 16px 12px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
 .logo{width:36px;height:36px;border-radius:11px;background:linear-gradient(135deg,var(--gold2),var(--gold));color:#1a1405;display:grid;place-items:center;font-weight:800;font-size:12.5px;letter-spacing:-.5px;flex:none}
 header h1{font-size:17px;margin:0;flex:1}
 header h1 small{display:block;font-size:11px;color:var(--muted);font-weight:400}
@@ -28,7 +28,7 @@ h2{font-size:15px;margin:18px 0 10px;color:var(--gold2)}
 .btn.danger{background:transparent;color:var(--red);border:1px solid #4a2326}
 .btn.small{padding:8px 10px;font-size:12px;width:auto;display:inline-block}
 .btn:disabled{opacity:.5}
-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:560px;background:rgba(14,14,16,.97);backdrop-filter:blur(10px);border-top:1px solid var(--line);display:flex;padding:8px 6px calc(env(safe-area-inset-bottom) + 8px);z-index:30}
+nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:560px;background:rgba(14,14,16,.97);border-top:1px solid var(--line);display:flex;padding:8px 6px calc(env(safe-area-inset-bottom) + 8px);z-index:30}
 nav button{flex:1;background:none;border:0;color:var(--muted);font-size:11px;display:flex;flex-direction:column;align-items:center;gap:3px;padding:4px;position:relative;font-family:inherit}
 nav button span{font-size:20px}
 nav button.on{color:var(--gold2)}
@@ -71,6 +71,7 @@ a{color:var(--gold2)}
 .rcp{width:72px;height:72px;object-fit:cover;border-radius:10px;border:1px solid var(--line);cursor:pointer}
 .rcbig{position:fixed;inset:0;background:rgba(0,0,0,.94);z-index:80;display:grid;place-items:center;padding:10px;overflow:auto}.rcbig img{max-width:100%;max-height:100%;object-fit:contain}
 .kv{font-size:14px;margin-bottom:3px}.kv span{color:var(--muted)}
+button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 </style>
 </head>
 <body>
@@ -94,7 +95,7 @@ a{color:var(--gold2)}
     shipped: ["Yo'lda", '#b48cff'], arrived: ['Keldi', '#3ecf8e'], done: ['Yakunlandi', '#3ecf8e'], cancelled: ['Bekor qilindi', '#9a978c'] };
   var sb = null;
   try { sb = window.supabase.createClient(window.QSHOP.SUPABASE_URL, window.QSHOP.SUPABASE_KEY); } catch(e){}
-  var S = { tab: 'orders', orders: [], products: [], shop: {}, info: {}, cats: [], pay: {}, cq: '', copen: '', accts: [], calc: { rate: 1750, markup: 30 }, filter: 'all', editing: null, busy: false };
+  var S = { tab: 'orders', orders: [], products: [], shop: {}, info: {}, cats: [], pay: {}, shown: 30, cshown: 30, cq: '', copen: '', accts: [], calc: { rate: 1750, markup: 30 }, filter: 'all', editing: null, busy: false };
 
   function toast(t){ var el = $('toast'); el.textContent = t; el.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(function(){ el.classList.remove('show'); }, 2600); }
   function fmtDate(iso){ try { return new Date(iso).toLocaleString('ru', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); } catch(e){ return ''; } }
@@ -132,7 +133,7 @@ a{color:var(--gold2)}
 
   /* ---------- Ma'lumot ---------- */
   async function loadOrders(){
-    var r = await sb.from('orders').select('*').order('created_at', { ascending: false }).limit(500);
+    var r = await sb.from('orders').select('*').order('created_at', { ascending: false }).limit(200);
     if (r.error) throw r.error; S.orders = r.data || [];
   }
   async function loadProducts(){
@@ -143,6 +144,15 @@ a{color:var(--gold2)}
     var r = await sb.from('settings').select('key,value');
     if (r.error) throw r.error;
     (r.data || []).forEach(function(x){ if (x.key === 'shop') S.shop = x.value || {}; if (x.key === 'info') S.info = x.value || {}; if (x.key === 'calc' && x.value) S.calc = { rate: +x.value.rate || 1750, markup: x.value.markup === undefined ? 30 : +x.value.markup }; if (x.key === 'pay') S.pay = x.value || {}; if (x.key === 'categories') S.cats = (x.value && x.value.list) || []; });
+  }
+  function sig(){ return S.orders.length + ':' + S.orders.map(function(o){ return o.id + o.status + (o.paid ? 1 : 0) + (+o.shipping || 0) + (o.receipt_thumb ? 1 : 0); }).join(',').length + ':' + (S.orders[0] ? S.orders[0].id : 0); }
+  async function refreshTab(tab){
+    if (tab !== 'orders' && tab !== 'stats' && tab !== 'customers') return;
+    var before = sig() + '|' + S.accts.length;
+    try { await loadOrders(); if (tab === 'customers') await loadAccounts(); } catch(e){ return; }
+    var active = document.activeElement;
+    if (S.tab !== tab || (before === sig() + '|' + S.accts.length) || $('modal').classList.contains('show') || (active && /INPUT|TEXTAREA|SELECT/.test(active.tagName))) return;
+    var y = window.scrollY; render(); window.scrollTo(0, y);
   }
   async function refreshAll(){
     try { await Promise.all([loadOrders(), loadProducts(), loadSettings()]); } catch(e){ toast('Yuklashda xatolik: ' + errMsg(e)); }
@@ -174,6 +184,7 @@ a{color:var(--gold2)}
       Object.keys(STATUS).map(function(k){ return '<button class="chip ' + (S.filter === k ? 'on' : '') + '" data-filter="' + k + '">' + STATUS[k][0] + ' ' + counts[k] + '</button>'; }).join('') + '</div>';
     var list = S.orders.filter(function(o){ return S.filter === 'all' || o.status === S.filter; });
     if (!list.length) return chips + '<div class="empty"><b>📭</b>Buyurtma yo\'q.</div>';
+    var total = list.length; list = list.slice(0, S.shown);
     return chips + list.map(function(o){
       var st = STATUS[o.status] || [o.status, '#9a978c'];
       var d = phoneDigits(o.phone);
@@ -184,7 +195,7 @@ a{color:var(--gold2)}
           return '<div class="ord item">' + kv('Mahsulot', sp.name) + sp.opts.map(function(x){ var k = x.indexOf(':'); return kv(x.slice(0, k), x.slice(k + 1).trim()); }).join('') +
             kv('Soni', i.qty + ' dona' + (i.group ? ' (guruh)' : '')) + kv('Narxi', money(i.unit * i.qty)) + '</div>';
         }).join('') +
-        (o.receipt_thumb ? '<div class="ord item"><div class="muted" style="margin-bottom:6px">To\'lov cheki (kattalashtirish uchun bosing):</div><img class="rcp" data-rcp="' + o.id + '" src="' + esc(o.receipt_thumb) + '" alt="chek"></div>' : (S.pay && S.pay.card ? '<div class="ord item"><span class="muted">To\'lov cheki: </span><b style="color:#ff4d4f">yuklanmagan</b></div>' : '')) +
+        (o.receipt_thumb ? '<div class="ord item"><div class="muted" style="margin-bottom:6px">To\'lov cheki (kattalashtirish uchun bosing):</div><img class="rcp" loading="lazy" decoding="async" data-rcp="' + o.id + '" src="' + esc(o.receipt_thumb) + '" alt="chek"></div>' : (S.pay && S.pay.card ? '<div class="ord item"><span class="muted">To\'lov cheki: </span><b style="color:#ff4d4f">yuklanmagan</b></div>' : '')) +
         '<label style="margin:8px 0;font-size:14px;color:var(--text)"><input type="checkbox" data-paid="' + o.id + '"' + (o.paid ? ' checked' : '') + '> ✅ To\'lov qabul qilindi</label>' +
         '<div class="row sp"><span class="muted">Tovarlar</span><b>' + money(o.total) + '</b></div>' +
         '<label>Yuk (kargo) narxi, so\'m — mijoz ko\'radi</label><input type="number" inputmode="numeric" data-ship="' + o.id + '" value="' + esc(+o.shipping || '') + '" placeholder="Masalan: 25000">' +
@@ -193,7 +204,7 @@ a{color:var(--gold2)}
         '<label>Izoh (faqat sizga ko\'rinadi)</label><input data-anote="' + o.id + '" value="' + esc(o.admin_note) + '" placeholder="Masalan: yuan kursi 1750">' +
         '<div class="row" style="flex-wrap:wrap"><a class="btn small ghost" href="tel:+' + d + '">📞 Qo\'ng\'iroq</a><a class="btn small ghost" target="_blank" rel="noopener" href="https://t.me/+' + d + '">✈️ Telegram</a>' +
         '<button class="btn small danger" data-delorder="' + o.id + '" style="margin-left:auto">O\'chirish</button></div></div>';
-    }).join('');
+    }).join('') + (total > list.length ? '<button class="btn ghost" data-more="o" style="margin-bottom:12px">Yana ko\'rsatish (' + (total - list.length) + ')</button>' : '');
   }
   async function setStatus(id, status){
     var o = S.orders.filter(function(x){ return x.id === id; })[0]; if (!o) return;
@@ -468,6 +479,7 @@ a{color:var(--gold2)}
       return c.name.toLowerCase().indexOf(q) >= 0 || (qd && (c.phone.replace(/\D/g, '').indexOf(qd) >= 0 || (c.acc && String(1000 + c.acc.id) === qd)));
     });
     if (!list.length) return '<div class="empty"><b>👥</b>Mijoz topilmadi.</div>';
+    var ctotal = list.length; list = list.slice(0, S.cshown);
     return list.map(function(c){
       var d = phoneDigits(c.phone), open = S.copen === c.key, a = c.acc;
       return '<div class="card"><div class="row sp" data-cust="' + esc(c.key) + '" style="cursor:pointer"><div style="min-width:0"><div style="font-weight:700">' + esc(c.name) + '</div>' +
@@ -483,7 +495,7 @@ a{color:var(--gold2)}
           '<div class="row" style="margin-top:10px;flex-wrap:wrap"><a class="btn small ghost" href="tel:+' + d + '">📞 Qo\'ng\'iroq</a><a class="btn small ghost" target="_blank" rel="noopener" href="https://t.me/+' + d + '">✈️ Telegram</a>' +
           (a ? '<button class="btn small ghost" data-custedit="' + a.id + '">✏️ Tahrirlash</button><button class="btn small ghost" data-resetpin="' + a.id + '">🔑 PIN tiklash</button><button class="btn small danger" data-block="' + a.id + '" data-to="' + (a.blocked ? '0' : '1') + '">' + (a.blocked ? 'Blokdan chiqarish' : '🚫 Bloklash') + '</button>' : '') + '</div>' : '') +
         '</div>';
-    }).join('');
+    }).join('') + (ctotal > list.length ? '<button class="btn ghost" data-more="c" style="margin-bottom:12px">Yana ko\'rsatish (' + (ctotal - list.length) + ')</button>' : '');
   }
   function openCustEdit(id){
     var a = S.accts.filter(function(x){ return x.id === id; })[0]; if (!a) return;
@@ -540,7 +552,7 @@ a{color:var(--gold2)}
 
   /* ---------- Hodisalar ---------- */
   document.addEventListener('click', async function(e){
-    var t = e.target.closest('[data-tab],[data-cust],[data-gocust],[data-custedit],#ce_save,[data-rcp],[data-resetpin],[data-block],[data-filter],[data-edit],[data-closemodal],[data-pickimg],[data-pickgal],[data-rmgal],[data-rmimg],[data-delprod],[data-delorder],#l_go,#pf_save,[data-pickgal],[data-rmgal],#cc_use,#cc_save,#tx_save,#logout,#refresh');
+    var t = e.target.closest('[data-tab],[data-cust],[data-more],[data-gocust],[data-custedit],#ce_save,[data-rcp],[data-resetpin],[data-block],[data-filter],[data-edit],[data-closemodal],[data-pickimg],[data-pickgal],[data-rmgal],[data-rmimg],[data-delprod],[data-delorder],#l_go,#pf_save,[data-pickgal],[data-rmgal],#cc_use,#cc_save,#tx_save,#logout,#refresh');
     if (!t) return;
     if (t.id === 'l_go') return doLogin();
     if (t.id === 'logout') return logout();
@@ -552,8 +564,9 @@ a{color:var(--gold2)}
     if (t.dataset.resetpin) return resetPin(+t.dataset.resetpin);
     if (t.dataset.block) return toggleBlock(+t.dataset.block, t.dataset.to === '1');
     if (t.dataset.cust !== undefined) { S.copen = S.copen === t.dataset.cust ? '' : t.dataset.cust; $('clist').innerHTML = custListHtml(); return; }
-    if (t.dataset.tab) { S.tab = t.dataset.tab; if (S.tab === 'orders' || S.tab === 'stats' || S.tab === 'customers') { try { await loadOrders(); } catch(x){} } if (S.tab === 'customers') await loadAccounts(); render(); window.scrollTo(0, 0); return; }
-    if (t.dataset.filter) { S.filter = t.dataset.filter; render(); return; }
+    if (t.dataset.tab) { S.tab = t.dataset.tab; S.shown = 30; S.cshown = 30; render(); window.scrollTo(0, 0); refreshTab(S.tab); return; }
+    if (t.dataset.more) { if (t.dataset.more === 'o') S.shown += 30; else { S.cshown += 30; } render(); return; }
+    if (t.dataset.filter) { S.filter = t.dataset.filter; S.shown = 30; render(); return; }
     if (t.dataset.edit) return openEdit(t.dataset.edit);
     if (t.dataset.closemodal) return closeModal();
     if (t.dataset.pickimg) return $('pf_file').click();
@@ -581,7 +594,7 @@ a{color:var(--gold2)}
   setInterval(async function(){
     if (document.hidden || !$('view') || S.tab !== 'orders' || $('modal').classList.contains('show')) return;
     var active = document.activeElement; if (active && /INPUT|TEXTAREA|SELECT/.test(active.tagName)) return;
-    try { await loadOrders(); render(); } catch(e){}
+    refreshTab('orders');
   }, 60000);
 
   async function boot(){

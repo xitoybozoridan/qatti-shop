@@ -35,12 +35,15 @@ h2{font-size:15px;margin:18px 0 10px;color:var(--gold2);letter-spacing:.3px}
 .card:active{transform:scale(.98)}
 .pic{aspect-ratio:1/1;background:var(--card2);display:grid;place-items:center;font-size:56px;position:relative;overflow:hidden}
 .pic img{width:100%;height:100%;object-fit:cover}
-.adtop{position:relative;aspect-ratio:16/9;border-radius:18px;overflow:hidden;background:var(--card2);margin-bottom:16px;border:1px solid var(--line);touch-action:pan-y}
-.adtop .sl{position:absolute;inset:0;opacity:0;transition:opacity .5s;pointer-events:none;display:block}
-.adtop .sl.on{opacity:1;pointer-events:auto}
-.adtop img,.adtop video,.adfeed img,.adfeed video,.adinfo img,.adinfo video{width:100%;height:100%;object-fit:cover;display:block}
+.adtop{position:relative;margin:0 0 16px;overflow:hidden;border-radius:18px;touch-action:pan-y}
+.adtrack{display:flex;gap:8px;transition:transform .45s ease;will-change:transform}
+.adtrack.nt{transition:none}
+.adtop .sl{flex:0 0 88%;aspect-ratio:12/5;position:relative;border-radius:16px;overflow:hidden;background:var(--card2);border:1px solid var(--line);display:block}
+.adtop.one .sl{flex-basis:100%}
+.adtop img,.adtop video,.adinfo img,.adinfo video{width:100%;height:100%;object-fit:contain;display:block}
+.adfeed img,.adfeed video{width:100%;height:100%;object-fit:contain;display:block}
 .adtag{position:absolute;top:8px;right:8px;background:rgba(0,0,0,.55);color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:7px;letter-spacing:.3px;z-index:2;pointer-events:none}
-.addots{position:absolute;bottom:8px;left:0;right:0;display:flex;justify-content:center;gap:5px;z-index:2;pointer-events:none}
+.addots{position:absolute;bottom:7px;left:0;right:0;display:flex;justify-content:center;gap:5px;z-index:2;pointer-events:none}
 .addots i{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.45)}
 .addots i.on{background:var(--gold2);width:16px;border-radius:4px}
 .adfeed{text-decoration:none;color:inherit}
@@ -331,36 +334,68 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
   }
   function adTopHtml(){
     var list = adList('top'); if (!list.length) return '';
-    var h = '<div class="adtop" id="adtop" data-n="' + list.length + '">' + list.map(function(a, i){
-      return adWrap(a, adMedia(a, { preload: i === 0 ? 'auto' : 'metadata' }) + '<span class="adtag">Reklama</span>', 'sl' + (i === 0 ? ' on' : '')).replace('class="sl', 'data-i="' + i + '" class="sl');
-    }).join('');
-    if (list.length > 1) h += '<div class="addots">' + list.map(function(a, i){ return '<i class="' + (i === 0 ? 'on' : '') + '"></i>'; }).join('') + '</div>';
+    var n = list.length;
+    var one = function(a, i, clone){
+      var dur = a.type === 'video' ? (a.dur || 5) : 0;
+      return adWrap(a, adMedia(a, { preload: i === 0 ? 'auto' : 'metadata' }) + '<span class="adtag">Reklama</span>', 'sl')
+        .replace('class="sl"', 'class="sl" data-i="' + i + '" data-dur="' + dur + '"' + (clone ? ' data-clone="1"' : ''));
+    };
+    var h = '<div class="adtop' + (n > 1 ? '' : ' one') + '" id="adtop" data-n="' + n + '"><div class="adtrack" id="adtrack">' +
+      list.map(function(a, i){ return one(a, i, false); }).join('') + (n > 1 ? one(list[0], 0, true).replace(/ data-ad="[^"]*"/, '') : '') + '</div>';
+    if (n > 1) h += '<div class="addots">' + list.map(function(a, i){ return '<i class="' + (i === 0 ? 'on' : '') + '"></i>'; }).join('') + '</div>';
     return h + '</div>';
   }
   var adTimer = null, adIdx = 0;
+  function adX(k, anim){
+    var tr = document.getElementById('adtrack'); if (!tr || !tr.children[k]) return;
+    if (!anim) tr.classList.add('nt');
+    tr.style.transform = 'translateX(' + (-tr.children[k].offsetLeft) + 'px)';
+    if (!anim) { void tr.offsetWidth; tr.classList.remove('nt'); }
+  }
+  function adMark(){
+    var box = document.getElementById('adtop'); if (!box) return;
+    var n = +box.dataset.n, tr = document.getElementById('adtrack'), real = adIdx % n;
+    var sl = tr.children, dots = box.querySelectorAll('.addots i');
+    for (var k = 0; k < sl.length; k++) {
+      var on = k === adIdx || (adIdx === n && k === 0 && false);
+      sl[k].classList.toggle('on', k === real);
+      var v = sl[k].querySelector('video');
+      if (v) { if (k === adIdx) { try { v.currentTime = 0; var pr = v.play(); if (pr && pr.catch) pr.catch(function(){}); } catch(e){} } else { try { v.pause(); } catch(e){} } }
+    }
+    for (var d = 0; d < dots.length; d++) dots[d].classList.toggle('on', d === real);
+    if (sl[real] && sl[real].dataset.ad) adHit(sl[real].dataset.ad, 'view');
+    var nx = sl[(adIdx + 1) % sl.length], nv = nx && nx.querySelector('video'); if (nv) nv.preload = 'auto';
+  }
   function adShow(i){
     var box = document.getElementById('adtop'); if (!box) return;
-    var sl = box.querySelectorAll('.sl'), dots = box.querySelectorAll('.addots i');
-    adIdx = (i + sl.length) % sl.length;
-    for (var k = 0; k < sl.length; k++) {
-      var on = k === adIdx; sl[k].classList.toggle('on', on);
-      if (dots[k]) dots[k].classList.toggle('on', on);
-      var v = sl[k].querySelector('video');
-      if (v) { if (on) { try { v.currentTime = 0; var pr = v.play(); if (pr && pr.catch) pr.catch(function(){}); } catch(e){} } else { try { v.pause(); } catch(e){} } }
-    }
-    var cur = sl[adIdx]; if (cur && cur.dataset.ad) adHit(cur.dataset.ad, 'view');
-    var nxt = sl[(adIdx + 1) % sl.length], nv = nxt && nxt.querySelector('video'); if (nv) nv.preload = 'auto';
+    var n = +box.dataset.n;
+    if (n < 2) { adIdx = 0; adX(0, false); adMark(); return; }
+    if (i < 0) { adX(n, false); adIdx = n - 1; adX(adIdx, true); }
+    else if (i >= n) {
+      adIdx = n; adX(n, true);
+      var tk = box; setTimeout(function(){ if (document.getElementById('adtop') !== tk) return; adIdx = 0; adX(0, false); adMark(); }, 480);
+    } else { adIdx = i; adX(i, true); }
+    adMark(); adSchedule();
+  }
+  function adSchedule(){
+    clearTimeout(adTimer);
+    var box = document.getElementById('adtop'); if (!box || +box.dataset.n < 2) return;
+    var cur = document.getElementById('adtrack').children[adIdx % +box.dataset.n];
+    var d = +(cur && cur.dataset.dur) || 0;
+    var ms = d ? Math.max(3, Math.min(5, d)) * 1000 : 3000;
+    adTimer = setTimeout(function(){
+      if (document.hidden || state.tab !== 'home' || document.getElementById('adtop') !== box) { if (document.getElementById('adtop') === box) adSchedule(); return; }
+      if (adHold) { adSchedule(); return; }
+      adShow(adIdx + 1);
+    }, ms);
   }
   function adStart(){
-    clearInterval(adTimer); adTimer = null; adIdx = 0;
+    clearTimeout(adTimer); adTimer = null; adIdx = 0;
     var box = document.getElementById('adtop'); if (!box) return;
-    adShow(0);
-    if (box.dataset.n > 1) adTimer = setInterval(function(){
-      if (document.hidden || state.tab !== 'home' || !document.getElementById('adtop') || document.getElementById('adtop') !== box || adHold) return;
-      adShow(adIdx + 1);
-    }, 5000);
+    adX(0, false); adMark(); adSchedule();
   }
   var adHold = false;
+  window.addEventListener('resize', function(){ if (document.getElementById('adtop')) adX(adIdx, false); });
   function adBind(){
     // bosh sahifadan tashqari reklamalar: ko'ringanda ko'rish hisoblanadi, video o'ynaydi
     var els = document.querySelectorAll('[data-adview]');
@@ -843,14 +878,14 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
     if (adSwiped) { e.preventDefault(); adSwiped = false; return; }
     adHit(a.dataset.ad, 'click');
   }, true);
-  var adSwiped = false, adX = null;
+  var adSwiped = false, adTx = null;
   document.addEventListener('touchstart', function(e){
     var b = e.target.closest && e.target.closest('#adtop'); if (!b) return;
-    adX = e.touches[0].clientX; adHold = true; adSwiped = false;
+    adTx = e.touches[0].clientX; adHold = true; adSwiped = false;
   }, { passive: true });
   document.addEventListener('touchend', function(e){
-    if (adX === null) return;
-    var dx = (e.changedTouches[0].clientX - adX); adX = null;
+    if (adTx === null) return;
+    var dx = (e.changedTouches[0].clientX - adTx); adTx = null;
     setTimeout(function(){ adHold = false; }, 3000);
     if (Math.abs(dx) > 40) { adSwiped = true; adShow(adIdx + (dx < 0 ? 1 : -1)); setTimeout(function(){ adSwiped = false; }, 350); }
   }, { passive: true });

@@ -637,21 +637,37 @@ label{font-size:12px;color:var(--muted);display:block;margin:0 0 4px 2px}
     else if (t.id === 'x' || t.id === 'x2' || t.id === 'bg') closeSheet();
   });
 
-  function makeJpeg(file, maxSide, q){
+  function loadImg(file){
     return new Promise(function(resolve, reject){
-      var url = URL.createObjectURL(file), img = new Image();
-      img.onload = function(){
-        var k = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
-        var c = document.createElement('canvas'); c.width = Math.max(1, Math.round(img.naturalWidth * k)); c.height = Math.max(1, Math.round(img.naturalHeight * k));
-        var g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height);
-        URL.revokeObjectURL(url); resolve(c.toDataURL('image/jpeg', q));
-      };
-      img.onerror = function(){ reject(new Error('Rasm ochilmadi')); }; img.src = url;
+      function viaReader(){
+        var fr = new FileReader();
+        fr.onload = function(){ var im = new Image(); im.onload = function(){ resolve(im); }; im.onerror = function(){ reject(new Error('format')); }; im.src = fr.result; };
+        fr.onerror = function(){ reject(new Error('format')); };
+        fr.readAsDataURL(file);
+      }
+      if (window.createImageBitmap) {
+        createImageBitmap(file).then(resolve).catch(function(){
+          var url = URL.createObjectURL(file), im = new Image();
+          im.onload = function(){ URL.revokeObjectURL(url); resolve(im); };
+          im.onerror = function(){ URL.revokeObjectURL(url); viaReader(); };
+          im.src = url;
+        });
+      } else viaReader();
     });
+  }
+  async function makeJpeg(file, maxSide, q){
+    var img = await loadImg(file);
+    var w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+    var k = Math.min(1, maxSide / Math.max(w, h));
+    var c = document.createElement('canvas'); c.width = Math.max(1, Math.round(w * k)); c.height = Math.max(1, Math.round(h * k));
+    var g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height);
+    if (img.close) img.close();
+    return c.toDataURL('image/jpeg', q);
   }
   async function readReceipt(file){
     var full = await makeJpeg(file, 1100, 0.72);
     if (full.length > 600000) full = await makeJpeg(file, 900, 0.55);
+    if (full.length > 650000) full = await makeJpeg(file, 700, 0.5);
     if (full.length > 650000) throw new Error('Rasm juda katta');
     return { full: full, thumb: await makeJpeg(file, 140, 0.6) };
   }
@@ -663,14 +679,14 @@ label{font-size:12px;color:var(--muted);display:block;margin:0 0 4px 2px}
       if (r.data && r.data.error) { toast(r.data.error); return; }
       state.orders.forEach(function(o){ if (String(o.no) === String(no)) o.thumb = rc.thumb; }); save('qs_orders', state.orders);
       toast('Chek yuborildi'); if (state.tab === 'orders') render();
-    } catch(e){ toast('Chek yuborilmadi: ' + (e.message || '')); }
+    } catch(e){ toast(e.message === 'format' ? 'Bu fayl rasm emas yoki formati mos emas. Skrinshot (PNG yoki JPG) yuklang' : 'Chek yuborilmadi: ' + (e.message || '')); }
   }
   document.addEventListener('change', async function(e){
     var t = e.target; if (!t || !t.files || !t.files[0]) return;
     var f = t.files[0];
     if (t.id === 'rc_file') {
       try { state.rcpt = await readReceipt(f); var bx = $('rcpt_box'); if (bx) bx.innerHTML = rcptBoxHtml(); toast('Chek yuklandi'); }
-      catch(err){ toast('Chek yuklanmadi: ' + (err.message || '')); }
+      catch(err){ toast(err.message === 'format' ? 'Bu fayl rasm emas yoki formati mos emas. Chek skrinshotini (PNG yoki JPG) yuklang' : 'Chek yuklanmadi: ' + (err.message || '')); }
       t.value = '';
     } else if (t.id === 'rc_late') { var no = state.attachNo; t.value = ''; if (no) lateReceipt(f, no); }
   });

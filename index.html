@@ -156,7 +156,7 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
   var DEFAULT_SHOP = { name: 'qSHOP', tagline: 'Xitoy tovarlari, guruh bilan arzon', hero_title: "Do'stlar bilan olsangiz — arzonroq",
     hero_text: "Mahsulotni tanlang, guruhga qo'shiling va do'stlaringizni chaqiring. Guruh to'lgach buyurtma Xitoydan yo'lga chiqadi.", admin_telegram: '' };
   var DEFAULT_INFO = { steps: [], note: '' };
-  var state = { products: [], shop: DEFAULT_SHOP, info: DEFAULT_INFO, categories: [], pay: {}, ads: {}, rcpt: null, cat: '', q: '', tab: 'home', cart: [], orders: [], loaded: false };
+  var state = { products: [], shop: DEFAULT_SHOP, info: DEFAULT_INFO, categories: [], pay: {}, coupon: null, ads: {}, rcpt: null, cat: '', q: '', tab: 'home', cart: [], orders: [], loaded: false };
   var sb = null;
   try { if (window.supabase && window.QSHOP && QSHOP.SUPABASE_URL) sb = window.supabase.createClient(QSHOP.SUPABASE_URL, QSHOP.SUPABASE_KEY); } catch(e){}
 
@@ -487,16 +487,57 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
     }).join('');
     var u = state.me ? { name: state.me.name, phone: fmtPhone(state.me.phone), addr: state.me.address } : load('qs_user', {});
     if (!state.me) return h + '<div class="card" style="padding:16px;margin-top:6px"><b>Buyurtma berish uchun kiring</b><p class="hint" style="margin:6px 0 12px">Telefon raqam va PIN bilan bir daqiqada ro\'yxatdan o\'tasiz. Savatingiz saqlanib turadi.</p><button class="btn" data-tab="profile" data-next="cart">Kirish / Ro\'yxatdan o\'tish</button></div>';
-    h += '<div class="total"><span>Jami</span><span>' + money(total) + '</span></div>';
+    h += '<div id="cpbox">' + cpBoxHtml(total) + '</div>';
     h += '<p class="hint" style="margin:-6px 0 12px">Yuk (kargo) narxi tovar kelgach, vazniga qarab alohida hisoblanadi.</p>';
     h += '<h2>Buyurtma ma\'lumotlari</h2>' +
       '<label>Ismingiz</label><input id="f_name" autocomplete="name" value="' + esc(u.name) + '">' +
       '<label>Telefon raqam</label><input id="f_phone" type="tel" autocomplete="tel" placeholder="+998" value="' + esc(u.phone) + '">' +
       '<label>Manzil (viloyat, shahar, ko\'cha)</label><input id="f_addr" autocomplete="street-address" value="' + esc(u.addr) + '">' +
       '<label>Izoh (rang, o\'lcham...)</label><textarea id="f_note" rows="2"></textarea>' +
-      payBoxHtml(total) +
+      payBoxHtml(couponNet(total)) +
       '<button class="btn" id="send">Buyurtma yuborish</button>';
     return h;
+  }
+
+  /* ---------- Promokod ---------- */
+  function couponDisc(c, total){
+    if (!c || total < (+c.min_total || 0)) return 0;
+    var d = c.kind === 'percent' ? Math.floor(total * Math.min(+c.value, 100) / 100) : +c.value;
+    if (c.kind === 'percent' && +c.max_discount > 0) d = Math.min(d, +c.max_discount);
+    return Math.max(0, Math.min(d, total));
+  }
+  function couponNet(total){ return total - couponDisc(state.coupon, total); }
+  function cartTotal(){ var t = 0; state.cart.forEach(function(i){ var p = byId(i.id); if (p) t += unitPrice(p, i.group) * i.qty; }); return t; }
+  function cpBoxHtml(total){
+    var c = state.coupon, h = '';
+    if (c) {
+      var d = couponDisc(c, total);
+      h += '<div class="card" style="border-color:' + (d ? '#2f6b47' : 'var(--gold)') + ';padding:12px;margin-bottom:10px"><div class="row" style="justify-content:space-between;align-items:center"><b>🎟 ' + esc(c.code) + '</b><button class="btn small ghost" data-cprm="1">✕</button></div>' +
+        (d ? '<div style="color:#6fcf97;margin-top:4px">Chegirma: −' + money(d) + '</div>'
+           : '<div class="muted" style="margin-top:4px">Chegirma yoqilishi uchun yana <b>' + money((+c.min_total || 0) - total) + '</b> lik mahsulot qo\'shing (kamida ' + money(c.min_total) + ').</div>') + '</div>';
+    } else {
+      h += '<div class="row" style="gap:8px;margin-bottom:10px"><input id="cp_in" placeholder="🎟 Promokod bormi?" autocapitalize="characters" autocomplete="off" style="margin:0;flex:1"><button class="btn small" id="cp_apply" style="width:auto">Qo\'llash</button></div><div id="cp_msg" class="hint" style="margin:-4px 0 8px"></div>';
+    }
+    var disc = couponDisc(c, total);
+    if (disc) h += '<div class="row" style="justify-content:space-between;color:var(--muted)"><span>Tovarlar</span><span>' + money(total) + '</span></div><div class="row" style="justify-content:space-between;color:#6fcf97"><span>Kupon</span><span>−' + money(disc) + '</span></div>';
+    return h + '<div class="total"><span>Jami</span><span id="pay_total">' + money(total - disc) + '</span></div>';
+  }
+  function cpRefresh(){
+    var b = $('cpbox'); if (!b) return; var t = cartTotal();
+    b.innerHTML = cpBoxHtml(t);
+    var pa = $('pay_amt'); if (pa) pa.textContent = money(couponNet(t));
+  }
+  async function applyCoupon(){
+    var inp = $('cp_in'), code = inp ? inp.value.trim() : '', msg = $('cp_msg');
+    if (!code) { if (msg) msg.textContent = 'Promokodni yozing'; return; }
+    if (!sb || !state.token) { toast('Avval tizimga kiring'); return; }
+    var btn = $('cp_apply'); btn.disabled = true;
+    var r; try { r = await sb.rpc('coupon_check', { p_token: state.token, p_code: code, p_total: cartTotal() }); } catch(e){ r = { error: { message: 'Tarmoq xatosi' } }; }
+    btn.disabled = false;
+    var d = r && r.data;
+    if (!d || r.error || d.error) { var m2 = $('cp_msg'); if (m2) { m2.style.color = 'var(--red)'; m2.textContent = (d && d.error) || 'Tekshirib bo\'lmadi, qayta urinib ko\'ring'; } return; }
+    state.coupon = { code: d.code, kind: d.kind, value: +d.value, min_total: +d.min_total, max_discount: +d.max_discount };
+    cpRefresh(); toast(couponDisc(state.coupon, cartTotal()) ? 'Promokod qo\'llandi 🎉' : 'Promokod qabul qilindi');
   }
 
   function fmtCard(c){ var d = String(c || '').replace(/\s+/g, ''); return /^\d{12,19}$/.test(d) ? d.replace(/(.{4})/g, '$1 ').trim() : String(c || ''); }
@@ -509,7 +550,7 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
   function payBoxHtml(total){
     var pc = state.pay; if (!pc.card) return '';
     return '<div class="card paybox"><b>💳 To\'lov</b>' +
-      '<p class="hint" style="margin:6px 0 0">1) Quyidagi kartaga <b>' + money(total) + '</b> o\'tkazing.<br>2) To\'lov chekini (skrinshot) yuklang.</p>' +
+      '<p class="hint" style="margin:6px 0 0">1) Quyidagi kartaga <b id="pay_amt">' + money(total) + '</b> o\'tkazing.<br>2) To\'lov chekini (skrinshot) yuklang.</p>' +
       '<div class="cardno"><b>' + esc(fmtCard(pc.card)) + '</b><button class="btn small ghost" data-copy="' + esc(String(pc.card).replace(/\s+/g, '')) + '">Nusxalash</button></div>' +
       (pc.holder ? '<div class="muted" style="margin-bottom:6px">👤 ' + esc(pc.holder) + '</div>' : '') +
       (pc.note ? '<div class="muted" style="margin-bottom:8px;font-size:12px">' + esc(pc.note) + '</div>' : '') +
@@ -526,7 +567,7 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
     return '<input type="file" id="rc_late" accept="image/*" style="display:none">' + state.orders.slice().reverse().map(function(o){
       return '<div class="order"><b>#' + esc(o.no) + '</b> · ' + esc(o.date) + '<br>' +
         o.items.map(function(i){ var sp = splitOpt(i.name); return '<div style="margin-bottom:6px"><b>' + esc(sp.name) + '</b> × ' + i.qty + (i.group ? ' (guruh)' : '') + sp.opts.map(function(x){ return '<div class="muted" style="margin-left:10px">' + esc(x) + '</div>'; }).join('') + '</div>'; }).join('') +
-        '<br>Tovarlar: <b>' + money(o.total) + '</b><br>' + shipHtml(o) + statusHtml(o.no) + orderPayHtml(o) + '</div>';
+        '<br>Tovarlar: <b>' + money(o.total + (+o.discount || 0)) + '</b><br>' + (+o.discount > 0 ? '🎟 Kupon ' + esc(o.coupon) + ': <b style="color:#6fcf97">−' + money(o.discount) + '</b><br>' : '') + shipHtml(o) + statusHtml(o.no) + orderPayHtml(o) + '</div>';
     }).join('');
   }
 
@@ -546,7 +587,7 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
       if (r.error || !r.data) return;
       var srv = r.data.map(function(x){
         state.statuses[x.id] = x.status; state.ship[x.id] = +x.shipping || 0;
-        return { no: x.id, date: new Date(x.created_at).toLocaleString('ru'), items: x.items || [], total: +x.total, phone: state.me ? state.me.phone : '', server: true, thumb: x.receipt_thumb || '', paid: !!x.paid };
+        return { no: x.id, date: new Date(x.created_at).toLocaleString('ru'), items: x.items || [], total: +x.total, discount: +x.discount || 0, coupon: x.coupon || '', phone: state.me ? state.me.phone : '', server: true, thumb: x.receipt_thumb || '', paid: !!x.paid };
       });
       var ids = {}; srv.forEach(function(o){ ids[o.no] = 1; });
       var local = state.orders.filter(function(o){ return !o.server && !ids[o.no]; });
@@ -757,15 +798,17 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
     var res;
     try {
       res = await sb.rpc('place_order', { p_name: name, p_phone: phone, p_address: addr, p_note: note,
-        p_items: state.cart.map(function(i){ return { id: i.id, qty: i.qty, group: i.group, opt: i.opt || '' }; }), p_token: state.token, p_receipt: state.rcpt ? state.rcpt.full : null, p_thumb: state.rcpt ? state.rcpt.thumb : null });
+        p_items: state.cart.map(function(i){ return { id: i.id, qty: i.qty, group: i.group, opt: i.opt || '' }; }), p_token: state.token, p_receipt: state.rcpt ? state.rcpt.full : null, p_thumb: state.rcpt ? state.rcpt.thumb : null, p_coupon: state.coupon ? state.coupon.code : null });
     } catch(e){ res = { error: { message: 'Tarmoq xatosi' } }; }
     if (res.error && /tizimga kiring/.test(res.error.message || '')) { clearSession(); state.tab = 'profile'; render(); toast('Seans tugagan. Qayta kiring'); return; }
+    if (res.error && /romokod|kupon/i.test(res.error.message || '')) { state.coupon = null; cpRefresh(); btn.disabled = false; btn.textContent = 'Buyurtma yuborish'; toast(res.error.message); return; }
     if (res.error) { btn.disabled = false; btn.textContent = 'Buyurtma yuborish'; toast('Xatolik: ' + (res.error.message || 'qayta urinib ko\'ring')); return; }
-    var no = res.data;
-    state.orders.push({ no: no, date: new Date().toLocaleString('ru'), items: items, total: total, phone: phone, server: true, thumb: state.rcpt ? state.rcpt.thumb : '', paid: false }); state.rcpt = null; save('qs_orders', state.orders);
+    var no = res.data, cdisc = couponDisc(state.coupon, total), ccode = cdisc ? state.coupon.code : '';
+    state.coupon = null;
+    state.orders.push({ no: no, date: new Date().toLocaleString('ru'), items: items, total: total - cdisc, discount: cdisc, coupon: ccode, phone: phone, server: true, thumb: state.rcpt ? state.rcpt.thumb : '', paid: false }); state.rcpt = null; save('qs_orders', state.orders);
     state.cart = []; save('qs_cart', state.cart);
     var msg = '🛍 Buyurtma #' + no + '\n' + items.map(function(i){ return '• ' + i.name + ' × ' + i.qty + (i.group ? ' (guruh)' : ''); }).join('\n') +
-      '\nJami: ' + money(total) + '\n👤 ' + name + '\n📞 ' + phone;
+      (cdisc ? '\n🎟 Kupon ' + ccode + ': −' + money(cdisc) : '') + '\nJami: ' + money(total - cdisc) + '\n👤 ' + name + '\n📞 ' + phone;
     var tg = tgName();
     $('sheet').innerHTML = '<button class="close" id="x">✕</button><div class="ok"><b>✅</b><div style="font-size:18px;font-weight:800">Buyurtma #' + esc(no) + ' qabul qilindi</div>' +
       '<p class="hint">Tez orada siz bilan bog\'lanamiz.' + (tg ? ' Tezroq javob olish uchun Telegramda ham yozishingiz mumkin.' : '') + '</p></div>' +
@@ -777,7 +820,7 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
   }
 
   document.addEventListener('click', function(e){
-    var t = e.target.closest('[data-tab],[data-pm],#p_login,#p_reg,#p_save,#p_pin,#p_logout,[data-cat],[data-open],[data-zoom],#lbx,[data-opt],[data-addg],[data-adds],[data-share],[data-inc],[data-dec],#send,#x,#x2,#bg');
+    var t = e.target.closest('[data-tab],[data-pm],#p_login,#p_reg,#p_save,#p_pin,#p_logout,[data-cat],[data-open],[data-zoom],#lbx,[data-opt],[data-addg],[data-adds],[data-share],[data-inc],[data-dec],#send,#cp_apply,[data-cprm],#x,#x2,#bg');
     if (!t) return;
     if (t.dataset.pm) { state.pmode = t.dataset.pm; render(); }
     else if (t.id === 'p_login') doLogin();
@@ -797,6 +840,8 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
     else if (t.dataset.inc != null) { state.cart[+t.dataset.inc].qty++; save('qs_cart', state.cart); render(); }
     else if (t.dataset.dec != null) { var i = +t.dataset.dec; state.cart[i].qty--; if (state.cart[i].qty <= 0) state.cart.splice(i, 1); save('qs_cart', state.cart); render(); }
     else if (t.id === 'send') sendOrder();
+    else if (t.id === 'cp_apply') applyCoupon();
+    else if (t.dataset.cprm) { state.coupon = null; cpRefresh(); }
     else if (t.id === 'x' || t.id === 'x2' || t.id === 'bg') closeSheet();
   });
 

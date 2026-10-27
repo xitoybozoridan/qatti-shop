@@ -509,19 +509,45 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
       v.src = url;
     });
   }
-  async function bigImage(file){
-    // sifat saqlanadi: kichik/o'rta rasm o'zgarishsiz; juda kattasi 2400px gacha kichraytiriladi
+  async function sniffImg(file){
+    var hd = new Uint8Array(await file.slice(0, 16).arrayBuffer()), a = String.fromCharCode.apply(null, hd), hex = Array.prototype.map.call(hd.slice(0, 8), function(b){ return ('0' + b.toString(16)).slice(-2); }).join(' ');
+    var t = '';
+    if (hd[0] === 0xFF && hd[1] === 0xD8) t = 'image/jpeg';
+    else if (a.slice(1, 4) === 'PNG') t = 'image/png';
+    else if (a.slice(0, 4) === 'RIFF' && a.slice(8, 12) === 'WEBP') t = 'image/webp';
+    else if (a.slice(0, 3) === 'GIF') t = 'image/gif';
+    return { type: t, hex: hex };
+  }
+  async function decodeImg(file){
+    // 3 xil usul bilan ochib ko'ramiz (telefonlar turlicha)
     var url = URL.createObjectURL(file);
     try {
-      var dim = await new Promise(function(res, rej){ var i = new Image(); i.onload = function(){ res([i.naturalWidth, i.naturalHeight, i]); }; i.onerror = function(){ rej(new Error('Rasm ochilmadi (JPG yoki PNG yuklang, video bo\'lsa MP4)')); }; i.src = url; });
-      var w = dim[0], h = dim[1];
-      if (Math.max(w, h) <= 2400 && file.size <= 6 * 1024 * 1024 && /^image\/(jpeg|png|webp|gif)$/.test(file.type)) return { blob: file, type: file.type, w: w, h: h };
-      var k = Math.min(1, 2400 / Math.max(w, h)), c = document.createElement('canvas');
-      c.width = Math.round(w * k); c.height = Math.round(h * k); c.getContext('2d').drawImage(dim[2], 0, 0, c.width, c.height);
-      var b = await new Promise(function(r){ c.toBlob(r, 'image/jpeg', 0.92); });
-      if (!b) throw new Error('Rasmni qayta ishlab bo\'lmadi');
-      return { blob: b, type: 'image/jpeg', w: c.width, h: c.height };
+      try { var im = await new Promise(function(res, rej){ var i = new Image(); i.onload = function(){ res(i); }; i.onerror = rej; i.src = url; }); if (im.naturalWidth) return { src: im, w: im.naturalWidth, h: im.naturalHeight }; } catch(e){}
     } finally { URL.revokeObjectURL(url); }
+    try { if (window.createImageBitmap) { var bm = await createImageBitmap(file); return { src: bm, w: bm.width, h: bm.height }; } } catch(e){}
+    try {
+      var du = await new Promise(function(res, rej){ var fr = new FileReader(); fr.onload = function(){ res(fr.result); }; fr.onerror = rej; fr.readAsDataURL(file); });
+      var im2 = await new Promise(function(res, rej){ var i = new Image(); i.onload = function(){ res(i); }; i.onerror = rej; i.src = du; });
+      if (im2.naturalWidth) return { src: im2, w: im2.naturalWidth, h: im2.naturalHeight };
+    } catch(e){}
+    return null;
+  }
+  async function bigImage(file){
+    // sifat saqlanadi: kichik/o'rta rasm o'zgarishsiz; juda kattasi 2400px gacha kichraytiriladi
+    var sn = await sniffImg(file), type = sn.type || file.type;
+    var dim = await decodeImg(file);
+    if (!dim) {
+      // brauzer ochib ko'rolmadi, lekin fayl haqiqiy rasm bo'lsa — o'zgartirmay yuklaymiz
+      if (sn.type) return { blob: file, type: sn.type, w: 0, h: 0 };
+      throw new Error('Rasm ochilmadi (fayl boshi: ' + sn.hex + '). JPG yoki PNG yuklang, video bo\'lsa MP4');
+    }
+    var w = dim.w, h = dim.h;
+    if (Math.max(w, h) <= 2400 && file.size <= 6 * 1024 * 1024 && /^image\/(jpeg|png|webp|gif)$/.test(type)) return { blob: file, type: type, w: w, h: h };
+    var k = Math.min(1, 2400 / Math.max(w, h)), c = document.createElement('canvas');
+    c.width = Math.round(w * k); c.height = Math.round(h * k); c.getContext('2d').drawImage(dim.src, 0, 0, c.width, c.height);
+    var b = await new Promise(function(r){ c.toBlob(r, 'image/jpeg', 0.92); });
+    if (!b) throw new Error('Rasmni qayta ishlab bo\'lmadi');
+    return { blob: b, type: 'image/jpeg', w: c.width, h: c.height };
   }
   function extOf(type, name){
     var m = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif', 'video/mp4': 'mp4', 'video/webm': 'webm', 'video/quicktime': 'mov' };
@@ -606,7 +632,7 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
       '<label>Qadamlar (har bir qator — bitta qadam)</label><textarea id="tx_steps" rows="7">' + esc((inf.steps || []).join('\n')) + '</textarea>' +
       '<label>Muhim eslatma</label><textarea id="tx_note" rows="4">' + esc(inf.note) + '</textarea>' +
       '<button class="btn" id="tx_save">Saqlash</button>' +
-      '<div class="muted" style="text-align:center;margin:22px 0 8px;font-size:12px">Admin ilova versiyasi: 2026.10.27-f (reklama)</div>';
+      '<div class="muted" style="text-align:center;margin:22px 0 8px;font-size:12px">Admin ilova versiyasi: 2026.10.27-g (reklama)</div>';
   }
   async function saveTexts(){
     var shop = { name: $('tx_name').value.trim() || 'qSHOP', tagline: $('tx_tag').value.trim(), hero_title: $('tx_ht').value.trim(), hero_text: $('tx_hx').value.trim(), admin_telegram: $('tx_tg').value.trim(), search_ph: $('tx_sph').value.trim(), group_mode: $('tx_gm').checked };

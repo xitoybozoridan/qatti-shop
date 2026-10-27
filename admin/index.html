@@ -632,7 +632,7 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
       '<label>Qadamlar (har bir qator — bitta qadam)</label><textarea id="tx_steps" rows="7">' + esc((inf.steps || []).join('\n')) + '</textarea>' +
       '<label>Muhim eslatma</label><textarea id="tx_note" rows="4">' + esc(inf.note) + '</textarea>' +
       '<button class="btn" id="tx_save">Saqlash</button>' +
-      '<div class="muted" style="text-align:center;margin:22px 0 8px;font-size:12px">Admin ilova versiyasi: 2026.10.27-g (reklama)</div>';
+      '<div class="muted" style="text-align:center;margin:22px 0 8px;font-size:12px">Admin ilova versiyasi: 2026.10.27-h (reklama)</div>';
   }
   async function saveTexts(){
     var shop = { name: $('tx_name').value.trim() || 'qSHOP', tagline: $('tx_tag').value.trim(), hero_title: $('tx_ht').value.trim(), hero_text: $('tx_hx').value.trim(), admin_telegram: $('tx_tg').value.trim(), search_ph: $('tx_sph').value.trim(), group_mode: $('tx_gm').checked };
@@ -792,9 +792,17 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
   });
   document.addEventListener('keydown', function(e){ if (e.key === 'Enter' && e.target && (e.target.id === 'l_pass' || e.target.id === 'l_email')) doLogin(); });
   document.addEventListener('input', function(e){ if (e.target && e.target.id === 'cu_q') { S.cq = e.target.value; $('clist').innerHTML = custListHtml(); return; }  if (e.target && /^cc_/.test(e.target.id)) calcUpdate(); });
-  document.addEventListener('change', function(e){
+  document.addEventListener('change', async function(e){
     var t = e.target;
-    if (t.id === 'ad_file') { var f = t.files && t.files[0]; t.value = ''; if (f && S._adslot) adUpload(f, S._adslot); return; }
+    if (t.id === 'ad_file') {
+      var f = t.files && t.files[0]; if (!f || !S._adslot) { t.value = ''; return; }
+      // faylni darrov xotiraga nusxalaymiz (Android'da fayl havolasi tezda eskirib qoladi)
+      S._adst = { msg: 'Fayl o\'qilmoqda: ' + (f.name || '') + ' (' + (f.size / 1048576).toFixed(1) + ' MB)...' }; adsRender();
+      var snap = null;
+      try { var buf = await f.arrayBuffer(); snap = new File([buf], f.name || 'fayl', { type: f.type || '' }); }
+      catch(err){ t.value = ''; S._adst = { err: true, msg: 'Telefon faylni o\'qishga ruxsat bermadi. Faylni avval Galereya yoki «Yuklanmalar» (Downloads) papkasiga saqlab, shu yerdan tanlang (Telegram yoki «Oxirgi» ro\'yxatidan emas). Keyin qayta urinib ko\'ring.' }; adsRender(); return; }
+      t.value = ''; adUpload(snap, S._adslot); return;
+    }
     if (t.dataset && t.dataset.adtog) { var q = t.dataset.adtog.split(':'); S.ads[q[0]][+q[1]].on = t.checked; return; }
     if (t.dataset && t.dataset.adlink) { var q2 = t.dataset.adlink.split(':'), nl = normLink(t.value); if (nl === null) { toast('Havola noto\'g\'ri. Masalan: t.me/kanal yoki https://sayt.uz'); S.ads[q2[0]][+q2[1]].link = t.value.trim(); return; } t.value = nl; S.ads[q2[0]][+q2[1]].link = nl; return; }
     if (t.dataset && t.dataset.status) return setStatus(+t.dataset.status, t.value);

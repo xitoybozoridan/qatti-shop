@@ -408,9 +408,9 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
   /* ---------- Matnlar ---------- */
   /* ---------- Reklama ---------- */
   var AD_SLOTS = [
-    { k: 'top', name: '1) Bosh sahifa tepasi', max: 10, vid: 5, hint: 'Aylanib turadi (har 3 soniyada, video bo\'lsa uning uzunligicha). Rasm o\'lchami: 1200×500 piksel (keng, 12:5) — shunda to\'liq to\'ldiradi. Video ham shu nisbatda, 5 soniyagacha.' },
-    { k: 'feed', name: '2) Mahsulotlar orasida', max: 6, vid: 10, hint: 'Mahsulot kartochkasi kabi chiqadi (4-mahsulotdan keyin, so\'ng har 8 tadan). Rasm o\'lchami: 800×800 piksel (kvadrat). Video 10 soniyagacha.' },
-    { k: 'info', name: '3) «Ma\'lumot» pastida', max: 3, vid: 30, hint: 'Telegram tugmasi tagida. Rasm yoki 30 soniyagacha video (sifati o\'zgarmaydi). Rasm to\'liq ko\'rinadi, istalgan o\'lcham bo\'ladi.' }
+    { k: 'top', name: '1) Bosh sahifa tepasi', max: 10, vid: 5, ratio: 12 / 5, size: '1200×500', hint: 'Aylanib turadi (har 3 soniyada, video bo\'lsa uning uzunligicha). Rasm o\'lchami: 1200×500 piksel (keng, 12:5) — shunda to\'liq to\'ldiradi. Video ham shu nisbatda, 5 soniyagacha.' },
+    { k: 'feed', name: '2) Mahsulotlar orasida', max: 6, vid: 10, ratio: 1, size: '800×800', hint: 'Mahsulot kartochkasi kabi chiqadi (4-mahsulotdan keyin, so\'ng har 8 tadan). Rasm o\'lchami: 800×800 piksel (kvadrat). Video 10 soniyagacha.' },
+    { k: 'info', name: '3) «Ma\'lumot» pastida', max: 3, vid: 30, ratio: 0, size: 'istalgan (masalan 1080×1350 yoki 1280×720)', hint: 'Telegram tugmasi tagida. Rasm yoki 30 soniyagacha video (sifati o\'zgarmaydi). Rasm to\'liq ko\'rinadi, istalgan o\'lcham bo\'ladi.' }
   ];
   function normAds(v){
     v = v || {}; var o = {};
@@ -427,9 +427,15 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
   async function loadAdStats(){
     try { var r = await sb.from('ad_stats').select('*'); S.adstats = {}; (r.data || []).forEach(function(x){ S.adstats[x.ad_id] = x; }); } catch(e){}
   }
+  var AD_SPEC = "qatti.SHOP reklama talablari\n\n" +
+    "1) BOSH SAHIFA TEPASI (aylanib turadi)\n• Rasm: 1200×500 piksel (12:5, keng), JPG/PNG/WebP, 1 MB gacha\n• Video: MP4 (H.264), 1200×500, ko'pi bilan 5 soniya, ovozsiz, 5 MB gacha\n• Muhim yozuv va logotipni chetdan 40 px ichkariga joylang\n\n" +
+    "2) MAHSULOTLAR ORASIDA\n• Rasm: 800×800 piksel (kvadrat), JPG/PNG/WebP, 500 KB gacha\n• Video: MP4 (H.264), 800×800, ko'pi bilan 10 soniya\n\n" +
+    "3) «MA'LUMOT» BO'LIMI PASTIDA\n• Rasm: eni 1080 piksel (masalan 1080×1350 yoki 1280×720), JPG/PNG\n• Video: MP4 (H.264), ko'pi bilan 30 soniya, 20 MB gacha\n\n" +
+    "Umumiy: matn katta va o'qiladigan bo'lsin; havola (sayt, Telegram, Instagram yoki ilova) yuboring; o'lcham boshqacha bo'lsa chetlari kesilishi mumkin.";
   function adsHtml(){
     var ads = S.ads || normAds();
-    return (S._adst ? '<div class="card" style="border-color:' + (S._adst.err ? 'var(--red)' : 'var(--gold)') + ';font-size:13px">' + (S._adst.err ? '❌ ' : '⏳ ') + esc(S._adst.msg) + '</div>' : '') + AD_SLOTS.map(function(sl){
+    return '<details class="card" style="margin-bottom:10px"><summary style="font-weight:700;cursor:pointer">📋 Reklamachilarga talablar (nusxa olish)</summary><div class="muted" style="white-space:pre-wrap;margin:8px 0;font-size:12.5px">' + esc(AD_SPEC) + '</div><button class="btn small" data-adcopy="1">Nusxa olish</button></details>' +
+      (S._adst ? '<div class="card" style="border-color:' + (S._adst.err ? 'var(--red)' : 'var(--gold)') + ';font-size:13px">' + (S._adst.err ? '❌ ' : '⏳ ') + esc(S._adst.msg) + '</div>' : '') + AD_SLOTS.map(function(sl){
       var list = ads[sl.k] || [];
       return '<div class="card"><div style="font-weight:700;margin-bottom:2px">' + esc(sl.name) + ' <span class="muted">(' + list.length + '/' + sl.max + ')</span></div>' +
         '<div class="muted" style="margin-bottom:8px">' + esc(sl.hint) + '</div>' +
@@ -509,12 +515,12 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
     try {
       var dim = await new Promise(function(res, rej){ var i = new Image(); i.onload = function(){ res([i.naturalWidth, i.naturalHeight, i]); }; i.onerror = function(){ rej(new Error('Rasm ochilmadi')); }; i.src = url; });
       var w = dim[0], h = dim[1];
-      if (Math.max(w, h) <= 2400 && file.size <= 6 * 1024 * 1024 && /^image\/(jpeg|png|webp|gif)$/.test(file.type)) return { blob: file, type: file.type };
+      if (Math.max(w, h) <= 2400 && file.size <= 6 * 1024 * 1024 && /^image\/(jpeg|png|webp|gif)$/.test(file.type)) return { blob: file, type: file.type, w: w, h: h };
       var k = Math.min(1, 2400 / Math.max(w, h)), c = document.createElement('canvas');
       c.width = Math.round(w * k); c.height = Math.round(h * k); c.getContext('2d').drawImage(dim[2], 0, 0, c.width, c.height);
       var b = await new Promise(function(r){ c.toBlob(r, 'image/jpeg', 0.92); });
       if (!b) throw new Error('Rasmni qayta ishlab bo\'lmadi');
-      return { blob: b, type: 'image/jpeg' };
+      return { blob: b, type: 'image/jpeg', w: c.width, h: c.height };
     } finally { URL.revokeObjectURL(url); }
   }
   function extOf(type, name){
@@ -541,14 +547,17 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
         if (!mi.dur) { if (!confirm('Video davomiyligini tekshirib bo\'lmadi. Baribir yuklaymi? (u ' + sl.vid + ' soniyadan oshmasligi kerak)')) throw new Error('Bekor qilindi'); }
         else if (mi.dur > sl.vid + 0.4) throw new Error('Video ' + Math.round(mi.dur) + ' soniya. Bu joy uchun ko\'pi bilan ' + sl.vid + ' soniya');
         var vt = file.type || (/\.webm$/i.test(file.name) ? 'video/webm' : /\.mov$/i.test(file.name) ? 'video/quicktime' : 'video/mp4');
-        item.type = 'video'; item.url = await putAd(file, vt, slot, file.name); item.dur = mi.dur ? Math.round(mi.dur * 10) / 10 : 0;
+        item._w = mi.w; item._h = mi.h; item.type = 'video'; item.url = await putAd(file, vt, slot, file.name); item.dur = mi.dur ? Math.round(mi.dur * 10) / 10 : 0;
         if (mi.poster) { try { item.poster = await putAd(mi.poster, 'image/jpeg', slot + '-p', 'p.jpg'); } catch(e){} }
       } else {
         if (!/^image\//.test(file.type)) throw new Error('Faqat rasm yoki video');
         var im = await bigImage(file);
-        item.type = 'image'; item.url = await putAd(im.blob, im.type, slot, file.name);
+        item._w = im.w; item._h = im.h; item.type = 'image'; item.url = await putAd(im.blob, im.type, slot, file.name);
       }
-      S.ads[slot].push(item); S._adst = null; adsRender(); toast('Yuklandi. Havola yozing va «Reklamani saqlash» ni bosing');
+      var warn = '';
+      if (sl.ratio && item._w && item._h) { var rr = item._w / item._h; if (Math.abs(rr - sl.ratio) / sl.ratio > 0.06) warn = ' ⚠️ Nisbat ' + sl.size + ' emas, chetlari kesilib ko\'rinadi'; }
+      delete item._w; delete item._h;
+      S.ads[slot].push(item); S._adst = warn ? { msg: 'Yuklandi.' + warn } : null; adsRender(); toast('Yuklandi.' + warn + ' Havola yozing va «Reklamani saqlash» ni bosing');
     } catch(e){ var em = (e && e.message ? errMsg(e) : String(e)); S._adst = { err: true, msg: 'Yuklanmadi: ' + em + ' [' + (file.name || '') + ', ' + (file.size / 1048576).toFixed(1) + ' MB, ' + (file.type || '?') + ']' }; adsRender(); toast('Yuklanmadi: ' + em); }
   }
   async function adSave(){
@@ -591,7 +600,7 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
       '<label>Qadamlar (har bir qator — bitta qadam)</label><textarea id="tx_steps" rows="7">' + esc((inf.steps || []).join('\n')) + '</textarea>' +
       '<label>Muhim eslatma</label><textarea id="tx_note" rows="4">' + esc(inf.note) + '</textarea>' +
       '<button class="btn" id="tx_save">Saqlash</button>' +
-      '<div class="muted" style="text-align:center;margin:22px 0 8px;font-size:12px">Admin ilova versiyasi: 2026.10.26-d (reklama)</div>';
+      '<div class="muted" style="text-align:center;margin:22px 0 8px;font-size:12px">Admin ilova versiyasi: 2026.10.27-e (reklama)</div>';
   }
   async function saveTexts(){
     var shop = { name: $('tx_name').value.trim() || 'qSHOP', tagline: $('tx_tag').value.trim(), hero_title: $('tx_ht').value.trim(), hero_text: $('tx_hx').value.trim(), admin_telegram: $('tx_tg').value.trim(), search_ph: $('tx_sph').value.trim(), group_mode: $('tx_gm').checked };
@@ -719,7 +728,7 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
 
   /* ---------- Hodisalar ---------- */
   document.addEventListener('click', async function(e){
-    var t = e.target.closest('[data-adadd],[data-addel],[data-admv],#ad_save,[data-tab],[data-cust],[data-more],[data-gocust],[data-custedit],#ce_save,[data-rcp],[data-resetpin],[data-block],[data-filter],[data-edit],[data-closemodal],[data-pickimg],[data-pickgal],[data-rmgal],[data-rmimg],[data-delprod],[data-delorder],#l_go,#pf_save,[data-pickgal],[data-rmgal],#cc_use,#cc_save,#tx_save,#logout,#refresh');
+    var t = e.target.closest('[data-adcopy],[data-adadd],[data-addel],[data-admv],#ad_save,[data-tab],[data-cust],[data-more],[data-gocust],[data-custedit],#ce_save,[data-rcp],[data-resetpin],[data-block],[data-filter],[data-edit],[data-closemodal],[data-pickimg],[data-pickgal],[data-rmgal],[data-rmimg],[data-delprod],[data-delorder],#l_go,#pf_save,[data-pickgal],[data-rmgal],#cc_use,#cc_save,#tx_save,#logout,#refresh');
     if (!t) return;
     if (t.id === 'l_go') return doLogin();
     if (t.id === 'logout') return logout();
@@ -746,6 +755,7 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
     if (t.id === 'cc_use') { var c = calcVals(); if (c.sell > 0) { $('pf_price').value = c.sell; toast('Narx qo\'yildi'); } else toast('Avval ¥ narxini kiriting'); return; }
     if (t.id === 'cc_save') return calcSave();
     if (t.id === 'tx_save') return saveTexts();
+    if (t.dataset.adcopy) { try { await navigator.clipboard.writeText(AD_SPEC); toast('Nusxa olindi. Reklamachiga yuboring'); } catch(e){ toast('Nusxa olinmadi, matnni belgilab oling'); } return; }
     if (t.dataset.adadd || t.dataset.addel || t.dataset.admv || t.id === 'ad_save') return adAction(t);
   });
   document.addEventListener('keydown', function(e){ if (e.key === 'Enter' && e.target && (e.target.id === 'l_pass' || e.target.id === 'l_email')) doLogin(); });

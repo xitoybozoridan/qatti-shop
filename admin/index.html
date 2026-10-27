@@ -24,6 +24,13 @@ main{padding:14px 16px}
 h2{font-size:15px;margin:18px 0 10px;color:var(--gold2)}
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:10px}
 .btn{border:0;border-radius:12px;padding:12px 14px;font-weight:700;font-size:14px;cursor:pointer;color:#1a1405;background:linear-gradient(135deg,var(--gold2),var(--gold));width:100%;display:block;text-align:center;text-decoration:none;font-family:inherit}
+.mn{display:flex;align-items:center;gap:14px;cursor:pointer;padding:14px}
+.mn:active{transform:scale(.99)}
+.mn .ic{font-size:28px;width:34px;text-align:center}
+.mn .t{flex:1;min-width:0}
+.mn .t b{display:block;font-size:15px}
+.mn .go{color:var(--muted);font-size:20px}
+.back{background:none;border:0;color:var(--gold2);font-size:15px;font-weight:700;padding:4px 0 10px;cursor:pointer}
 .btn.ghost{background:transparent;color:var(--text);border:1px solid var(--line)}
 .btn.danger{background:transparent;color:var(--red);border:1px solid #4a2326}
 .btn.small{padding:8px 10px;font-size:12px;width:auto;display:inline-block}
@@ -95,7 +102,7 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
     shipped: ["Yo'lda", '#b48cff'], arrived: ['Keldi', '#3ecf8e'], done: ['Yakunlandi', '#3ecf8e'], cancelled: ['Bekor qilindi', '#9a978c'] };
   var sb = null;
   try { sb = window.supabase.createClient(window.QSHOP.SUPABASE_URL, window.QSHOP.SUPABASE_KEY); } catch(e){}
-  var S = { coupons: [], ads: { top: [], feed: [], info: [] }, adstats: {}, _adslot: '', tab: 'orders', orders: [], products: [], shop: {}, info: {}, cats: [], pay: {}, shown: 30, cshown: 30, cq: '', copen: '', accts: [], calc: { rate: 1750, markup: 30 }, filter: 'all', editing: null, busy: false };
+  var S = { sub: '', coupons: [], ads: { top: [], feed: [], info: [] }, adstats: {}, _adslot: '', tab: 'orders', orders: [], products: [], shop: {}, info: {}, cats: [], pay: {}, shown: 30, cshown: 30, cq: '', copen: '', accts: [], calc: { rate: 1750, markup: 30 }, filter: 'all', editing: null, busy: false };
 
   function toast(t){ var el = $('toast'); el.textContent = t; el.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(function(){ el.classList.remove('show'); }, 2600); }
   function fmtDate(iso){ try { return new Date(iso).toLocaleString('ru', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); } catch(e){ return ''; } }
@@ -143,7 +150,7 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
   async function loadSettings(){
     var r = await sb.from('settings').select('key,value');
     if (r.error) throw r.error;
-    loadAdStats(); loadCoupons().then(function(){ cpRender(); });
+    loadAdStats(); loadCoupons().then(function(){ cpRender(); if (S.tab === 'texts' && !S.sub && $('view')) render(); });
     (r.data || []).forEach(function(x){ if (x.key === 'shop') S.shop = x.value || {}; if (x.key === 'info') S.info = x.value || {}; if (x.key === 'calc' && x.value) S.calc = { rate: +x.value.rate || 1750, markup: x.value.markup === undefined ? 30 : +x.value.markup }; if (x.key === 'pay') S.pay = x.value || {}; if (x.key === 'ads') S.ads = normAds(x.value); if (x.key === 'categories') S.cats = (x.value && x.value.list) || []; });
   }
   function sig(){ return S.orders.length + ':' + S.orders.map(function(o){ return o.id + o.status + (o.paid ? 1 : 0) + (+o.shipping || 0) + (o.receipt_thumb ? 1 : 0); }).join(',').length + ':' + (S.orders[0] ? S.orders[0].id : 0); }
@@ -166,7 +173,7 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
   }
   function renderNav(){
     var news = S.orders.filter(function(o){ return o.status === 'new'; }).length;
-    var items = [['orders', '📦', 'Buyurtmalar'], ['products', '🛍', 'Mahsulotlar'], ['customers', '👥', 'Mijozlar'], ['texts', '📝', 'Matnlar'], ['stats', '📊', 'Statistika']];
+    var items = [['orders', '📦', 'Buyurtmalar'], ['products', '🛍', 'Mahsulotlar'], ['customers', '👥', 'Mijozlar'], ['texts', '⚙️', 'Sozlamalar'], ['stats', '📊', 'Statistika']];
     $('nav').innerHTML = items.map(function(t){
       return '<button data-tab="' + t[0] + '" class="' + (S.tab === t[0] ? 'on' : '') + '">' + (t[0] === 'orders' && news ? '<em class="dot">' + news + '</em>' : '') + '<span>' + t[1] + '</span>' + t[2] + '</button>';
     }).join('');
@@ -673,40 +680,86 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
   }
 
   /* ---------- Matnlar ---------- */
+  var SUBS = [
+    ['home', '🏠', 'Asosiy sahifa'], ['coupons', '🎟', 'Kuponlar'], ['ads', '📢', 'Reklama'], ['pay', '💳', "To'lov"],
+    ['cats', '🗂', 'Kategoriyalar'], ['info', 'ℹ️', "«Ma'lumot» bo'limi"], ['calc', '💱', 'Yuan kursi']
+  ];
+  function subStatus(k){
+    var sh = S.shop || {}, pay = S.pay || {}, inf = S.info || {};
+    if (k === 'home') return esc(sh.name || 'qSHOP') + ' · ' + (gm() ? 'guruh rejimi yoqilgan' : 'oddiy do\'kon');
+    if (k === 'coupons') { var a = (S.coupons || []).filter(function(c){ return c.active; }).length; return S._cperr ? 'bazani yoqish kerak' : a + ' ta faol · jami ' + (S.coupons || []).length; }
+    if (k === 'ads') { var n = 0; ['top', 'feed', 'info'].forEach(function(x){ n += ((S.ads || {})[x] || []).length; }); return n + ' ta reklama'; }
+    if (k === 'pay') return pay.card ? 'karta kiritilgan · chek ' + (pay.required === false ? 'majburiy emas' : 'majburiy') : 'karta kiritilmagan';
+    if (k === 'cats') return (S.cats || []).length + ' ta kategoriya';
+    if (k === 'info') return (inf.steps || []).length + ' ta qadam' + (inf.note ? ' · eslatma bor' : '');
+    if (k === 'calc') return '1 ¥ = ' + money(S.calc.rate) + ' · ustama ' + (+S.calc.markup || 0) + '%';
+    return '';
+  }
   function viewTexts(){
-    var sh = S.shop || {}, inf = S.info || {};
-    return '<h2 style="margin-top:4px">🎟 Kuponlar (promokod)</h2><div id="cpadm">' + couponsHtml() + '</div>' +
-      '<h2>📢 Reklama</h2><div id="adbox">' + adsHtml() + '</div>' +
-      '<h2>Asosiy sahifa</h2>' +
+    var ver = '<div class="muted" style="text-align:center;margin:22px 0 8px;font-size:12px">Admin ilova versiyasi: 2026.10.27-j (sozlamalar)</div>';
+    if (!S.sub) {
+      return '<h2 style="margin-top:4px">Sozlamalar</h2>' + SUBS.map(function(x){
+        return '<div class="card mn" data-sub="' + x[0] + '"><span class="ic">' + x[1] + '</span><div class="t"><b>' + x[2] + '</b><span class="muted">' + subStatus(x[0]) + '</span></div><span class="go">›</span></div>';
+      }).join('') + ver;
+    }
+    var title = SUBS.filter(function(x){ return x[0] === S.sub; })[0];
+    var h = '<button class="back" data-sub="">← Sozlamalar</button><h2 style="margin-top:0">' + (title ? title[1] + ' ' + title[2] : '') + '</h2>';
+    var sh = S.shop || {}, inf = S.info || {}, pay = S.pay || {};
+    if (S.sub === 'home') h +=
       '<label>Do\'kon nomi</label><input id="tx_name" value="' + esc(sh.name) + '">' +
       '<label>Sarlavha ostidagi qisqa matn</label><input id="tx_tag" value="' + esc(sh.tagline) + '">' +
       '<label>Katta banner sarlavhasi</label><input id="tx_ht" value="' + esc(sh.hero_title) + '">' +
       '<label>Banner matni</label><textarea id="tx_hx" rows="3">' + esc(sh.hero_text) + '</textarea>' +
+      '<div class="muted" style="margin:-4px 0 6px">Bosh sahifa tepasida reklama bo\'lsa, banner o\'rniga reklama chiqadi.</div>' +
       '<label>Qidiruv maydonidagi yozuv</label><input id="tx_sph" value="' + esc(sh.search_ph || '') + '" placeholder="🔍 Mahsulot qidirish...">' +
       '<label>Sizning Telegram username (@siz)</label><input id="tx_tg" value="' + esc(sh.admin_telegram) + '" placeholder="@username">' +
       '<label style="margin:6px 0 4px;font-size:14px;color:var(--text)"><input type="checkbox" id="tx_gm"' + (gm() ? ' checked' : '') + '> Guruh rejimi</label>' +
-      '<div class="muted" style="margin-bottom:14px">' + "O'chirilsa: ilova oddiy do'kon bo'ladi, mahsulotda bitta narx ko'rinadi, guruhga qo'shilish tugmasi yo'qoladi. Banner va «Ma'lumot» matnlarini ham mosiga o'zgartiring." + '</div>' +
-      '<h2>To\'lov</h2><div class="muted" style="margin-bottom:8px">Karta raqami bo\'sh bo\'lsa, mijozlarda to\'lov bo\'limi chiqmaydi.</div>' +
-      '<label>Karta raqami</label><input id="tx_card" inputmode="numeric" value="' + esc((S.pay || {}).card) + '" placeholder="8600 0000 0000 0000">' +
-      '<label>Karta egasi (ism)</label><input id="tx_holder" value="' + esc((S.pay || {}).holder) + '">' +
-      '<label>Izoh (masalan: bank nomi)</label><input id="tx_paynote" value="' + esc((S.pay || {}).note) + '">' +
-      '<label style="margin:6px 0 14px;font-size:14px;color:var(--text)"><input type="checkbox" id="tx_payreq"' + ((S.pay || {}).required === false ? '' : ' checked') + '> To\'lov cheki majburiy</label>' +
-      '<h2>Kategoriyalar</h2><label>Har bir qator — bitta kategoriya</label><textarea id="tx_cats" rows="5">' + esc((S.cats || []).join('\n')) + '</textarea>' +
-      '<h2>"Ma\'lumot" bo\'limi</h2>' +
-      '<label>Qadamlar (har bir qator — bitta qadam)</label><textarea id="tx_steps" rows="7">' + esc((inf.steps || []).join('\n')) + '</textarea>' +
+      '<div class="muted" style="margin-bottom:14px">O\'chirilsa: ilova oddiy do\'kon bo\'ladi, mahsulotda bitta narx ko\'rinadi, guruhga qo\'shilish tugmasi yo\'qoladi. Banner va «Ma\'lumot» matnlarini ham mosiga o\'zgartiring.</div>' +
+      '<button class="btn" id="sv_home">Saqlash</button>';
+    else if (S.sub === 'coupons') h += '<div id="cpadm">' + couponsHtml() + '</div>';
+    else if (S.sub === 'ads') h += '<div id="adbox">' + adsHtml() + '</div>';
+    else if (S.sub === 'pay') h +=
+      '<div class="muted" style="margin-bottom:8px">Karta raqami bo\'sh bo\'lsa, mijozlarda to\'lov bo\'limi chiqmaydi.</div>' +
+      '<label>Karta raqami</label><input id="tx_card" inputmode="numeric" value="' + esc(pay.card) + '" placeholder="8600 0000 0000 0000">' +
+      '<label>Karta egasi (ism)</label><input id="tx_holder" value="' + esc(pay.holder) + '">' +
+      '<label>Izoh (masalan: bank nomi)</label><input id="tx_paynote" value="' + esc(pay.note) + '">' +
+      '<label style="margin:6px 0 14px;font-size:14px;color:var(--text)"><input type="checkbox" id="tx_payreq"' + (pay.required === false ? '' : ' checked') + '> To\'lov cheki majburiy</label>' +
+      '<button class="btn" id="sv_pay">Saqlash</button>';
+    else if (S.sub === 'cats') h +=
+      '<label>Har bir qator — bitta kategoriya</label><textarea id="tx_cats" rows="8">' + esc((S.cats || []).join('\n')) + '</textarea>' +
+      '<button class="btn" id="sv_cats">Saqlash</button>';
+    else if (S.sub === 'info') h +=
+      '<label>Qadamlar (har bir qator — bitta qadam)</label><textarea id="tx_steps" rows="8">' + esc((inf.steps || []).join('\n')) + '</textarea>' +
       '<label>Muhim eslatma</label><textarea id="tx_note" rows="4">' + esc(inf.note) + '</textarea>' +
-      '<button class="btn" id="tx_save">Saqlash</button>' +
-      '<div class="muted" style="text-align:center;margin:22px 0 8px;font-size:12px">Admin ilova versiyasi: 2026.10.27-i (kupon)</div>';
+      '<button class="btn" id="sv_info">Saqlash</button>';
+    else if (S.sub === 'calc') h +=
+      '<div class="muted" style="margin-bottom:8px">Mahsulot qo\'shishdagi hisoblagich shu kurs va foizdan foydalanadi.</div>' +
+      '<label>Yuan kursi (1 ¥ necha so\'m)</label><input id="ys_rate" type="number" inputmode="numeric" value="' + esc(S.calc.rate) + '">' +
+      '<label>Ustama foiz (%)</label><input id="ys_mk" type="number" inputmode="numeric" value="' + esc(S.calc.markup) + '">' +
+      '<button class="btn" id="sv_calc">Saqlash</button>';
+    return h + ver;
   }
-  async function saveTexts(){
-    var shop = { name: $('tx_name').value.trim() || 'qSHOP', tagline: $('tx_tag').value.trim(), hero_title: $('tx_ht').value.trim(), hero_text: $('tx_hx').value.trim(), admin_telegram: $('tx_tg').value.trim(), search_ph: $('tx_sph').value.trim(), group_mode: $('tx_gm').checked };
-    var info = { steps: $('tx_steps').value.split('\n').map(function(s){ return s.trim(); }).filter(Boolean), note: $('tx_note').value.trim() };
-    var cats = $('tx_cats').value.split('\n').map(function(s){ return s.trim(); }).filter(function(x, i, a){ return x && a.indexOf(x) === i; });
-    var pay = { card: $('tx_card').value.trim(), holder: $('tx_holder').value.trim(), note: $('tx_paynote').value.trim(), required: $('tx_payreq').checked };
-    var now = new Date().toISOString();
-    var r = await sb.from('settings').upsert([{ key: 'shop', value: shop, updated_at: now }, { key: 'info', value: info, updated_at: now }, { key: 'categories', value: { list: cats }, updated_at: now }, { key: 'pay', value: pay, updated_at: now }]);
+  async function saveSub(k){
+    var now = new Date().toISOString(), rows, apply;
+    if (k === 'home') {
+      var shop = Object.assign({}, S.shop, { name: $('tx_name').value.trim() || 'qSHOP', tagline: $('tx_tag').value.trim(), hero_title: $('tx_ht').value.trim(), hero_text: $('tx_hx').value.trim(), admin_telegram: $('tx_tg').value.trim(), search_ph: $('tx_sph').value.trim(), group_mode: $('tx_gm').checked });
+      rows = [{ key: 'shop', value: shop, updated_at: now }]; apply = function(){ S.shop = shop; };
+    } else if (k === 'pay') {
+      var pay = { card: $('tx_card').value.trim(), holder: $('tx_holder').value.trim(), note: $('tx_paynote').value.trim(), required: $('tx_payreq').checked };
+      rows = [{ key: 'pay', value: pay, updated_at: now }]; apply = function(){ S.pay = pay; };
+    } else if (k === 'cats') {
+      var cats = $('tx_cats').value.split('\n').map(function(x){ return x.trim(); }).filter(function(x, i, a){ return x && a.indexOf(x) === i; });
+      rows = [{ key: 'categories', value: { list: cats }, updated_at: now }]; apply = function(){ S.cats = cats; };
+    } else if (k === 'info') {
+      var info = { steps: $('tx_steps').value.split('\n').map(function(x){ return x.trim(); }).filter(Boolean), note: $('tx_note').value.trim() };
+      rows = [{ key: 'info', value: info, updated_at: now }]; apply = function(){ S.info = info; };
+    } else if (k === 'calc') {
+      var v = { rate: parseFloat($('ys_rate').value) || 1750, markup: parseFloat($('ys_mk').value) || 0 };
+      rows = [{ key: 'calc', value: v, updated_at: now }]; apply = function(){ S.calc = v; };
+    } else return;
+    var r = await sb.from('settings').upsert(rows);
     if (r.error) { toast('Xatolik: ' + errMsg(r.error)); return; }
-    S.shop = shop; S.info = info; S.cats = cats; S.pay = pay; toast('Saqlandi. Mijozlarda darrov yangilanadi');
+    apply(); toast('Saqlandi. Mijozlarda darrov yangilanadi');
   }
 
   /* ---------- Statistika ---------- */
@@ -824,7 +877,7 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
 
   /* ---------- Hodisalar ---------- */
   document.addEventListener('click', async function(e){
-    var t = e.target.closest('[data-cpdel],#cf_add,[data-adcopy],[data-adadd],[data-addel],[data-admv],#ad_save,[data-tab],[data-cust],[data-more],[data-gocust],[data-custedit],#ce_save,[data-rcp],[data-resetpin],[data-block],[data-filter],[data-edit],[data-closemodal],[data-pickimg],[data-pickgal],[data-rmgal],[data-rmimg],[data-delprod],[data-delorder],#l_go,#pf_save,[data-pickgal],[data-rmgal],#cc_use,#cc_save,#tx_save,#logout,#refresh');
+    var t = e.target.closest('[data-sub],[id^=sv_],[data-cpdel],#cf_add,[data-adcopy],[data-adadd],[data-addel],[data-admv],#ad_save,[data-tab],[data-cust],[data-more],[data-gocust],[data-custedit],#ce_save,[data-rcp],[data-resetpin],[data-block],[data-filter],[data-edit],[data-closemodal],[data-pickimg],[data-pickgal],[data-rmgal],[data-rmimg],[data-delprod],[data-delorder],#l_go,#pf_save,[data-pickgal],[data-rmgal],#cc_use,#cc_save,#tx_save,#logout,#refresh');
     if (!t) return;
     if (t.id === 'l_go') return doLogin();
     if (t.id === 'logout') return logout();
@@ -836,7 +889,7 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
     if (t.dataset.resetpin) return resetPin(+t.dataset.resetpin);
     if (t.dataset.block) return toggleBlock(+t.dataset.block, t.dataset.to === '1');
     if (t.dataset.cust !== undefined) { S.copen = S.copen === t.dataset.cust ? '' : t.dataset.cust; $('clist').innerHTML = custListHtml(); return; }
-    if (t.dataset.tab) { S.tab = t.dataset.tab; S.shown = 30; S.cshown = 30; render(); window.scrollTo(0, 0); refreshTab(S.tab); return; }
+    if (t.dataset.tab) { S.tab = t.dataset.tab; if (S.tab === 'texts') S.sub = ''; S.shown = 30; S.cshown = 30; render(); window.scrollTo(0, 0); refreshTab(S.tab); return; }
     if (t.dataset.more) { if (t.dataset.more === 'o') S.shown += 30; else { S.cshown += 30; } render(); return; }
     if (t.dataset.filter) { S.filter = t.dataset.filter; S.shown = 30; render(); return; }
     if (t.dataset.edit) return openEdit(t.dataset.edit);
@@ -850,7 +903,8 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
     if (t.id === 'pf_save') return saveProduct();
     if (t.id === 'cc_use') { var c = calcVals(); if (c.sell > 0) { $('pf_price').value = c.sell; toast('Narx qo\'yildi'); } else toast('Avval ¥ narxini kiriting'); return; }
     if (t.id === 'cc_save') return calcSave();
-    if (t.id === 'tx_save') return saveTexts();
+    if (t.dataset.sub !== undefined) { S.sub = t.dataset.sub; render(); window.scrollTo(0, 0); return; }
+    if (/^sv_/.test(t.id)) return saveSub(t.id.slice(3));
     if (t.id === 'cf_add') return cpAdd();
     if (t.dataset.cpdel) return cpDel(+t.dataset.cpdel);
     if (t.dataset.adcopy) { try { await navigator.clipboard.writeText(AD_SPEC); toast('Nusxa olindi. Reklamachiga yuboring'); } catch(e){ toast('Nusxa olinmadi, matnni belgilab oling'); } return; }

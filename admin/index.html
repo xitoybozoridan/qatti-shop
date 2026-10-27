@@ -95,7 +95,7 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
     shipped: ["Yo'lda", '#b48cff'], arrived: ['Keldi', '#3ecf8e'], done: ['Yakunlandi', '#3ecf8e'], cancelled: ['Bekor qilindi', '#9a978c'] };
   var sb = null;
   try { sb = window.supabase.createClient(window.QSHOP.SUPABASE_URL, window.QSHOP.SUPABASE_KEY); } catch(e){}
-  var S = { ads: { top: [], feed: [], info: [] }, adstats: {}, _adslot: '', tab: 'orders', orders: [], products: [], shop: {}, info: {}, cats: [], pay: {}, shown: 30, cshown: 30, cq: '', copen: '', accts: [], calc: { rate: 1750, markup: 30 }, filter: 'all', editing: null, busy: false };
+  var S = { coupons: [], ads: { top: [], feed: [], info: [] }, adstats: {}, _adslot: '', tab: 'orders', orders: [], products: [], shop: {}, info: {}, cats: [], pay: {}, shown: 30, cshown: 30, cq: '', copen: '', accts: [], calc: { rate: 1750, markup: 30 }, filter: 'all', editing: null, busy: false };
 
   function toast(t){ var el = $('toast'); el.textContent = t; el.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(function(){ el.classList.remove('show'); }, 2600); }
   function fmtDate(iso){ try { return new Date(iso).toLocaleString('ru', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); } catch(e){ return ''; } }
@@ -143,7 +143,7 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
   async function loadSettings(){
     var r = await sb.from('settings').select('key,value');
     if (r.error) throw r.error;
-    loadAdStats();
+    loadAdStats(); loadCoupons().then(function(){ cpRender(); });
     (r.data || []).forEach(function(x){ if (x.key === 'shop') S.shop = x.value || {}; if (x.key === 'info') S.info = x.value || {}; if (x.key === 'calc' && x.value) S.calc = { rate: +x.value.rate || 1750, markup: x.value.markup === undefined ? 30 : +x.value.markup }; if (x.key === 'pay') S.pay = x.value || {}; if (x.key === 'ads') S.ads = normAds(x.value); if (x.key === 'categories') S.cats = (x.value && x.value.list) || []; });
   }
   function sig(){ return S.orders.length + ':' + S.orders.map(function(o){ return o.id + o.status + (o.paid ? 1 : 0) + (+o.shipping || 0) + (o.receipt_thumb ? 1 : 0); }).join(',').length + ':' + (S.orders[0] ? S.orders[0].id : 0); }
@@ -198,7 +198,8 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
         }).join('') +
         (o.receipt_thumb ? '<div class="ord item"><div class="muted" style="margin-bottom:6px">To\'lov cheki (kattalashtirish uchun bosing):</div><img class="rcp" loading="lazy" decoding="async" data-rcp="' + o.id + '" src="' + esc(o.receipt_thumb) + '" alt="chek"></div>' : (S.pay && S.pay.card ? '<div class="ord item"><span class="muted">To\'lov cheki: </span><b style="color:#ff4d4f">yuklanmagan</b></div>' : '')) +
         '<label style="margin:8px 0;font-size:14px;color:var(--text)"><input type="checkbox" data-paid="' + o.id + '"' + (o.paid ? ' checked' : '') + '> ✅ To\'lov qabul qilindi</label>' +
-        '<div class="row sp"><span class="muted">Tovarlar</span><b>' + money(o.total) + '</b></div>' +
+        '<div class="row sp"><span class="muted">Tovarlar</span><b>' + money((+o.total || 0) + (+o.discount || 0)) + '</b></div>' +
+        (+o.discount > 0 ? '<div class="row sp"><span class="muted">🎟 Kupon ' + esc(o.coupon) + '</span><b style="color:#6fcf97">−' + money(o.discount) + '</b></div>' : '') +
         '<label>Yuk (kargo) narxi, so\'m — mijoz ko\'radi</label><input type="number" inputmode="numeric" data-ship="' + o.id + '" value="' + esc(+o.shipping || '') + '" placeholder="Masalan: 25000">' +
         '<div class="row sp" style="margin-bottom:10px"><span class="muted">To\'lov jami</span><b style="color:var(--gold2)">' + money((+o.total || 0) + (+o.shipping || 0)) + '</b></div>' +
         '<label>Holat</label><select data-status="' + o.id + '">' + Object.keys(STATUS).map(function(k){ return '<option value="' + k + '"' + (k === o.status ? ' selected' : '') + '>' + STATUS[k][0] + '</option>'; }).join('') + '</select>' +
@@ -406,6 +407,68 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
   }
 
   /* ---------- Matnlar ---------- */
+  /* ---------- Kuponlar ---------- */
+  async function loadCoupons(){
+    try { var r = await sb.from('coupons').select('*').order('id', { ascending: false }); if (!r.error) { S.coupons = r.data || []; S._cperr = ''; } else S._cperr = errMsg(r.error); } catch(e){ S._cperr = errMsg(e); }
+  }
+  function cpDesc(c){
+    var v = c.kind === 'percent' ? (+c.value) + '%' : money(c.value);
+    var a = [v + ' chegirma'];
+    if (+c.min_total > 0) a.push('kamida ' + money(c.min_total));
+    if (c.kind === 'percent' && +c.max_discount > 0) a.push('ko\'pi bilan ' + money(c.max_discount));
+    a.push('ishlatilgan: ' + (c.used || 0) + (+c.max_uses > 0 ? '/' + c.max_uses : ''));
+    a.push(c.once_per_customer ? 'har mijozga 1 marta' : 'cheksiz marta');
+    if (c.expires_at) a.push('muddati: ' + new Date(c.expires_at).toLocaleDateString('ru'));
+    return a.join(' · ');
+  }
+  function couponsHtml(){
+    var h = '<div class="muted" style="margin-bottom:8px">Mijoz savatda promokodni yozadi — shartga to\'g\'ri kelsa chegirma avtomatik hisoblanadi.</div>';
+    if (S._cperr) h += '<div class="card" style="border-color:var(--red);font-size:13px">❌ ' + (/relation|does not exist|coupons/.test(S._cperr) ? 'Kupon bazasi hali yoqilmagan. Supabase\'da coupons.sql ni ishga tushiring.' : esc(S._cperr)) + '</div>';
+    h += (S.coupons || []).map(function(c){
+      var exp = c.expires_at && new Date(c.expires_at) < new Date(), full = +c.max_uses > 0 && c.used >= c.max_uses;
+      return '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b style="font-size:16px;letter-spacing:.5px">' + esc(c.code) + '</b>' +
+        '<span class="muted">' + (exp ? '⏰ muddati tugagan' : full ? '⛔ limit tugagan' : '') + '</span></div>' +
+        '<div class="muted" style="margin:4px 0 8px">' + esc(cpDesc(c)) + '</div>' +
+        '<label style="font-size:13px;color:var(--text)"><input type="checkbox" data-cptog="' + c.id + '"' + (c.active ? ' checked' : '') + '> Yoqilgan</label>' +
+        '<div style="margin-top:6px"><button class="btn small danger" data-cpdel="' + c.id + '">O\'chirish</button></div></div>';
+    }).join('');
+    h += '<div class="card"><div style="font-weight:700;margin-bottom:6px">➕ Yangi kupon</div>' +
+      '<label>Promokod (mijoz shuni yozadi)</label><input id="cf_code" placeholder="QATTI10" autocapitalize="characters" maxlength="30">' +
+      '<label>Chegirma turi</label><select id="cf_kind"><option value="percent">Foiz (%)</option><option value="fixed">Aniq summa (so\'m)</option></select>' +
+      '<label>Chegirma qiymati (10 yoki 20000)</label><input id="cf_val" type="number" inputmode="numeric" placeholder="10">' +
+      '<label>Kamida qancha xarid qilsa ishlasin, so\'m (masalan 100000 yoki 200000)</label><input id="cf_min" type="number" inputmode="numeric" placeholder="200000">' +
+      '<label>Foiz bo\'lsa: eng ko\'p chegirma, so\'m (bo\'sh = cheklanmagan)</label><input id="cf_max" type="number" inputmode="numeric" placeholder="30000">' +
+      '<label>Jami necha marta ishlatilsin (bo\'sh = cheksiz)</label><input id="cf_uses" type="number" inputmode="numeric" placeholder="100">' +
+      '<label>Amal qilish muddati (bo\'sh = cheksiz)</label><input id="cf_exp" type="date">' +
+      '<label style="margin:8px 0;font-size:14px;color:var(--text)"><input type="checkbox" id="cf_once" checked> Har mijoz faqat 1 marta ishlata olsin</label>' +
+      '<button class="btn" id="cf_add">Kuponni qo\'shish</button></div>';
+    return h;
+  }
+  function cpRender(){ var b = $('cpadm'); if (b) b.innerHTML = couponsHtml(); }
+  async function cpAdd(){
+    var code = $('cf_code').value.trim().toUpperCase().replace(/\s+/g, ''), kind = $('cf_kind').value, val = parseFloat($('cf_val').value);
+    var mn = parseFloat($('cf_min').value) || 0, mx = parseFloat($('cf_max').value) || 0, uses = parseInt($('cf_uses').value, 10) || 0, exp = $('cf_exp').value;
+    if (!/^[A-Z0-9_-]{3,30}$/.test(code)) { toast('Promokod: 3–30 ta lotin harf yoki raqam'); return; }
+    if (!(val > 0)) { toast('Chegirma qiymatini kiriting'); return; }
+    if (kind === 'percent' && val > 100) { toast('Foiz 100 dan oshmasin'); return; }
+    var row = { code: code, kind: kind, value: val, min_total: mn, max_discount: kind === 'percent' ? mx : 0, max_uses: uses, once_per_customer: $('cf_once').checked, active: true,
+      expires_at: exp ? new Date(exp + 'T23:59:59').toISOString() : null };
+    var r = await sb.from('coupons').insert(row);
+    if (r.error) { toast(/duplicate|unique/i.test(errMsg(r.error)) ? 'Bunday promokod allaqachon bor' : 'Xatolik: ' + errMsg(r.error)); return; }
+    await loadCoupons(); cpRender(); toast('Kupon qo\'shildi: ' + code);
+  }
+  async function cpToggle(id, on){
+    var r = await sb.from('coupons').update({ active: on }).eq('id', id);
+    if (r.error) { toast('Xatolik: ' + errMsg(r.error)); return; }
+    var c = S.coupons.filter(function(x){ return x.id === id; })[0]; if (c) c.active = on; toast(on ? 'Yoqildi' : 'O\'chirildi (mijozlar ishlata olmaydi)');
+  }
+  async function cpDel(id){
+    if (!confirm('Kupon o\'chirilsinmi?')) return;
+    var r = await sb.from('coupons').delete().eq('id', id);
+    if (r.error) { toast('Xatolik: ' + errMsg(r.error)); return; }
+    S.coupons = S.coupons.filter(function(x){ return x.id !== id; }); cpRender(); toast('O\'chirildi');
+  }
+
   /* ---------- Reklama ---------- */
   var AD_SLOTS = [
     { k: 'top', name: '1) Bosh sahifa tepasi', max: 10, vid: 5, ratio: 12 / 5, size: '1200×500', hint: 'Aylanib turadi (har 3 soniyada, video bo\'lsa uning uzunligicha). Rasm o\'lchami: 1200×500 piksel (keng, 12:5) — shunda to\'liq to\'ldiradi. Video ham shu nisbatda, 5 soniyagacha.' },
@@ -612,7 +675,8 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
   /* ---------- Matnlar ---------- */
   function viewTexts(){
     var sh = S.shop || {}, inf = S.info || {};
-    return '<h2 style="margin-top:4px">📢 Reklama</h2><div id="adbox">' + adsHtml() + '</div>' +
+    return '<h2 style="margin-top:4px">🎟 Kuponlar (promokod)</h2><div id="cpadm">' + couponsHtml() + '</div>' +
+      '<h2>📢 Reklama</h2><div id="adbox">' + adsHtml() + '</div>' +
       '<h2>Asosiy sahifa</h2>' +
       '<label>Do\'kon nomi</label><input id="tx_name" value="' + esc(sh.name) + '">' +
       '<label>Sarlavha ostidagi qisqa matn</label><input id="tx_tag" value="' + esc(sh.tagline) + '">' +
@@ -632,7 +696,7 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
       '<label>Qadamlar (har bir qator — bitta qadam)</label><textarea id="tx_steps" rows="7">' + esc((inf.steps || []).join('\n')) + '</textarea>' +
       '<label>Muhim eslatma</label><textarea id="tx_note" rows="4">' + esc(inf.note) + '</textarea>' +
       '<button class="btn" id="tx_save">Saqlash</button>' +
-      '<div class="muted" style="text-align:center;margin:22px 0 8px;font-size:12px">Admin ilova versiyasi: 2026.10.27-h (reklama)</div>';
+      '<div class="muted" style="text-align:center;margin:22px 0 8px;font-size:12px">Admin ilova versiyasi: 2026.10.27-i (kupon)</div>';
   }
   async function saveTexts(){
     var shop = { name: $('tx_name').value.trim() || 'qSHOP', tagline: $('tx_tag').value.trim(), hero_title: $('tx_ht').value.trim(), hero_text: $('tx_hx').value.trim(), admin_telegram: $('tx_tg').value.trim(), search_ph: $('tx_sph').value.trim(), group_mode: $('tx_gm').checked };
@@ -760,7 +824,7 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
 
   /* ---------- Hodisalar ---------- */
   document.addEventListener('click', async function(e){
-    var t = e.target.closest('[data-adcopy],[data-adadd],[data-addel],[data-admv],#ad_save,[data-tab],[data-cust],[data-more],[data-gocust],[data-custedit],#ce_save,[data-rcp],[data-resetpin],[data-block],[data-filter],[data-edit],[data-closemodal],[data-pickimg],[data-pickgal],[data-rmgal],[data-rmimg],[data-delprod],[data-delorder],#l_go,#pf_save,[data-pickgal],[data-rmgal],#cc_use,#cc_save,#tx_save,#logout,#refresh');
+    var t = e.target.closest('[data-cpdel],#cf_add,[data-adcopy],[data-adadd],[data-addel],[data-admv],#ad_save,[data-tab],[data-cust],[data-more],[data-gocust],[data-custedit],#ce_save,[data-rcp],[data-resetpin],[data-block],[data-filter],[data-edit],[data-closemodal],[data-pickimg],[data-pickgal],[data-rmgal],[data-rmimg],[data-delprod],[data-delorder],#l_go,#pf_save,[data-pickgal],[data-rmgal],#cc_use,#cc_save,#tx_save,#logout,#refresh');
     if (!t) return;
     if (t.id === 'l_go') return doLogin();
     if (t.id === 'logout') return logout();
@@ -787,6 +851,8 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
     if (t.id === 'cc_use') { var c = calcVals(); if (c.sell > 0) { $('pf_price').value = c.sell; toast('Narx qo\'yildi'); } else toast('Avval ¥ narxini kiriting'); return; }
     if (t.id === 'cc_save') return calcSave();
     if (t.id === 'tx_save') return saveTexts();
+    if (t.id === 'cf_add') return cpAdd();
+    if (t.dataset.cpdel) return cpDel(+t.dataset.cpdel);
     if (t.dataset.adcopy) { try { await navigator.clipboard.writeText(AD_SPEC); toast('Nusxa olindi. Reklamachiga yuboring'); } catch(e){ toast('Nusxa olinmadi, matnni belgilab oling'); } return; }
     if (t.dataset.adadd || t.dataset.addel || t.dataset.admv || t.id === 'ad_save') return adAction(t);
   });
@@ -803,6 +869,7 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
       catch(err){ t.value = ''; S._adst = { err: true, msg: 'Telefon faylni o\'qishga ruxsat bermadi. Faylni avval Galereya yoki «Yuklanmalar» (Downloads) papkasiga saqlab, shu yerdan tanlang (Telegram yoki «Oxirgi» ro\'yxatidan emas). Keyin qayta urinib ko\'ring.' }; adsRender(); return; }
       t.value = ''; adUpload(snap, S._adslot); return;
     }
+    if (t.dataset && t.dataset.cptog) return cpToggle(+t.dataset.cptog, t.checked);
     if (t.dataset && t.dataset.adtog) { var q = t.dataset.adtog.split(':'); S.ads[q[0]][+q[1]].on = t.checked; return; }
     if (t.dataset && t.dataset.adlink) { var q2 = t.dataset.adlink.split(':'), nl = normLink(t.value); if (nl === null) { toast('Havola noto\'g\'ri. Masalan: t.me/kanal yoki https://sayt.uz'); S.ads[q2[0]][+q2[1]].link = t.value.trim(); return; } t.value = nl; S.ads[q2[0]][+q2[1]].link = nl; return; }
     if (t.dataset && t.dataset.status) return setStatus(+t.dataset.status, t.value);

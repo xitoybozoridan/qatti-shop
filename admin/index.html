@@ -513,7 +513,7 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
     // sifat saqlanadi: kichik/o'rta rasm o'zgarishsiz; juda kattasi 2400px gacha kichraytiriladi
     var url = URL.createObjectURL(file);
     try {
-      var dim = await new Promise(function(res, rej){ var i = new Image(); i.onload = function(){ res([i.naturalWidth, i.naturalHeight, i]); }; i.onerror = function(){ rej(new Error('Rasm ochilmadi')); }; i.src = url; });
+      var dim = await new Promise(function(res, rej){ var i = new Image(); i.onload = function(){ res([i.naturalWidth, i.naturalHeight, i]); }; i.onerror = function(){ rej(new Error('Rasm ochilmadi (JPG yoki PNG yuklang, video bo\'lsa MP4)')); }; i.src = url; });
       var w = dim[0], h = dim[1];
       if (Math.max(w, h) <= 2400 && file.size <= 6 * 1024 * 1024 && /^image\/(jpeg|png|webp|gif)$/.test(file.type)) return { blob: file, type: file.type, w: w, h: h };
       var k = Math.min(1, 2400 / Math.max(w, h)), c = document.createElement('canvas');
@@ -535,7 +535,14 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
   }
   async function adUpload(file, slot){
     var sl = AD_SLOTS.filter(function(x){ return x.k === slot; })[0];
-    var isVid = /^video\//.test(file.type) || /\.(mp4|mov|webm)$/i.test(file.name);
+    var isVid = /^video\//.test(file.type) || /\.(mp4|mov|webm|m4v|3gp)$/i.test(file.name);
+    try {   // fayl ichiga qarab turini aniqlaymiz (telefon ba'zan nomi/turini yo'qotadi)
+      var hd = new Uint8Array(await file.slice(0, 16).arrayBuffer());
+      var ascii = String.fromCharCode.apply(null, hd);
+      if (ascii.slice(4, 8) === 'ftyp' && !/^ftyp(heic|heix|mif1|avif|msf1)/.test(ascii.slice(4, 12))) isVid = true;
+      else if (hd[0] === 0x1A && hd[1] === 0x45 && hd[2] === 0xDF && hd[3] === 0xA3) isVid = true;
+      else if ((hd[0] === 0xFF && hd[1] === 0xD8) || ascii.slice(1, 4) === 'PNG' || (ascii.slice(0, 4) === 'RIFF' && ascii.slice(8, 12) === 'WEBP') || ascii.slice(0, 3) === 'GIF') isVid = false;
+    } catch(e){}
     S._adst = { msg: 'Yuklanmoqda: ' + (file.name || '') + ' (' + (file.size / 1048576).toFixed(1) + ' MB, ' + (file.type || 'turi noma\'lum') + ')...' }; adsRender();
     try {
       if (S.ads[slot].length >= sl.max) throw new Error('Bu joyga ko\'pi bilan ' + sl.max + ' ta');
@@ -546,11 +553,10 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
         try { mi = await mediaInfo(file); } catch(e){}
         if (!mi.dur) { if (!confirm('Video davomiyligini tekshirib bo\'lmadi. Baribir yuklaymi? (u ' + sl.vid + ' soniyadan oshmasligi kerak)')) throw new Error('Bekor qilindi'); }
         else if (mi.dur > sl.vid + 0.4) throw new Error('Video ' + Math.round(mi.dur) + ' soniya. Bu joy uchun ko\'pi bilan ' + sl.vid + ' soniya');
-        var vt = file.type || (/\.webm$/i.test(file.name) ? 'video/webm' : /\.mov$/i.test(file.name) ? 'video/quicktime' : 'video/mp4');
+        var vt = /^video\//.test(file.type) ? file.type : (/\.webm$/i.test(file.name) ? 'video/webm' : /\.mov$/i.test(file.name) ? 'video/quicktime' : 'video/mp4');
         item._w = mi.w; item._h = mi.h; item.type = 'video'; item.url = await putAd(file, vt, slot, file.name); item.dur = mi.dur ? Math.round(mi.dur * 10) / 10 : 0;
         if (mi.poster) { try { item.poster = await putAd(mi.poster, 'image/jpeg', slot + '-p', 'p.jpg'); } catch(e){} }
       } else {
-        if (!/^image\//.test(file.type)) throw new Error('Faqat rasm yoki video');
         var im = await bigImage(file);
         item._w = im.w; item._h = im.h; item.type = 'image'; item.url = await putAd(im.blob, im.type, slot, file.name);
       }
@@ -600,7 +606,7 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
       '<label>Qadamlar (har bir qator — bitta qadam)</label><textarea id="tx_steps" rows="7">' + esc((inf.steps || []).join('\n')) + '</textarea>' +
       '<label>Muhim eslatma</label><textarea id="tx_note" rows="4">' + esc(inf.note) + '</textarea>' +
       '<button class="btn" id="tx_save">Saqlash</button>' +
-      '<div class="muted" style="text-align:center;margin:22px 0 8px;font-size:12px">Admin ilova versiyasi: 2026.10.27-e (reklama)</div>';
+      '<div class="muted" style="text-align:center;margin:22px 0 8px;font-size:12px">Admin ilova versiyasi: 2026.10.27-f (reklama)</div>';
   }
   async function saveTexts(){
     var shop = { name: $('tx_name').value.trim() || 'qSHOP', tagline: $('tx_tag').value.trim(), hero_title: $('tx_ht').value.trim(), hero_text: $('tx_hx').value.trim(), admin_telegram: $('tx_tg').value.trim(), search_ph: $('tx_sph').value.trim(), group_mode: $('tx_gm').checked };

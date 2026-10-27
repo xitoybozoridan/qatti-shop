@@ -150,7 +150,7 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
   async function loadSettings(){
     var r = await sb.from('settings').select('key,value');
     if (r.error) throw r.error;
-    loadAdStats(); loadCoupons().then(function(){ cpRender(); if (S.tab === 'texts' && !S.sub && $('view')) render(); });
+    loadAdStats(); loadChatThreads().then(renderNav); loadAnns(); loadRevs(); loadCoupons().then(function(){ cpRender(); if (S.tab === 'texts' && !S.sub && $('view')) render(); });
     (r.data || []).forEach(function(x){ if (x.key === 'shop') S.shop = x.value || {}; if (x.key === 'info') S.info = x.value || {}; if (x.key === 'calc' && x.value) S.calc = { rate: +x.value.rate || 1750, markup: x.value.markup === undefined ? 30 : +x.value.markup }; if (x.key === 'pay') S.pay = x.value || {}; if (x.key === 'ads') S.ads = normAds(x.value); if (x.key === 'categories') S.cats = (x.value && x.value.list) || []; });
   }
   function sig(){ return S.orders.length + ':' + S.orders.map(function(o){ return o.id + o.status + (o.paid ? 1 : 0) + (+o.shipping || 0) + (o.receipt_thumb ? 1 : 0); }).join(',').length + ':' + (S.orders[0] ? S.orders[0].id : 0); }
@@ -172,10 +172,11 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
       '<main id="view"></main><nav id="nav"></nav>';
   }
   function renderNav(){
+    if (!$('nav')) return;
     var news = S.orders.filter(function(o){ return o.status === 'new'; }).length;
     var items = [['orders', '📦', 'Buyurtmalar'], ['products', '🛍', 'Mahsulotlar'], ['customers', '👥', 'Mijozlar'], ['texts', '⚙️', 'Sozlamalar'], ['stats', '📊', 'Statistika']];
     $('nav').innerHTML = items.map(function(t){
-      return '<button data-tab="' + t[0] + '" class="' + (S.tab === t[0] ? 'on' : '') + '">' + (t[0] === 'orders' && news ? '<em class="dot">' + news + '</em>' : '') + '<span>' + t[1] + '</span>' + t[2] + '</button>';
+      return '<button data-tab="' + t[0] + '" class="' + (S.tab === t[0] ? 'on' : '') + '">' + (t[0] === 'orders' && news ? '<em class="dot">' + news + '</em>' : '') + (t[0] === 'texts' && S.chUnread ? '<em class="dot">' + S.chUnread + '</em>' : '') + '<span>' + t[1] + '</span>' + t[2] + '</button>';
     }).join('');
     $('sub').textContent = news ? news + ' ta yangi buyurtma' : '';
   }
@@ -207,6 +208,7 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
         '<label style="margin:8px 0;font-size:14px;color:var(--text)"><input type="checkbox" data-paid="' + o.id + '"' + (o.paid ? ' checked' : '') + '> ✅ To\'lov qabul qilindi</label>' +
         '<div class="row sp"><span class="muted">Tovarlar</span><b>' + money((+o.total || 0) + (+o.discount || 0)) + '</b></div>' +
         (+o.discount > 0 ? '<div class="row sp"><span class="muted">🎟 Kupon ' + esc(o.coupon) + '</span><b style="color:#6fcf97">−' + money(o.discount) + '</b></div>' : '') +
+        '<label>📮 Trek raqami (mijoz ko\'radi)</label><input data-track="' + o.id + '" value="' + esc(o.track || '') + '" placeholder="Masalan: YT1234567890123" autocapitalize="characters">' +
         '<label>Yuk (kargo) narxi, so\'m — mijoz ko\'radi</label><input type="number" inputmode="numeric" data-ship="' + o.id + '" value="' + esc(+o.shipping || '') + '" placeholder="Masalan: 25000">' +
         '<div class="row sp" style="margin-bottom:10px"><span class="muted">To\'lov jami</span><b style="color:var(--gold2)">' + money((+o.total || 0) + (+o.shipping || 0)) + '</b></div>' +
         '<label>Holat</label><select data-status="' + o.id + '">' + Object.keys(STATUS).map(function(k){ return '<option value="' + k + '"' + (k === o.status ? ' selected' : '') + '>' + STATUS[k][0] + '</option>'; }).join('') + '</select>' +
@@ -679,9 +681,194 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
     if (t.dataset.admv) { parts = t.dataset.admv.split(':'); var a = S.ads[parts[0]], i = +parts[1], j = i + +parts[2]; if (j < 0 || j >= a.length) return; var x = a[i]; a[i] = a[j]; a[j] = x; adsRender(); return; }
   }
 
+  /* ---------- Yordam (chat) / Xabar / Sharhlar / Trek ---------- */
+  function tmAgo(t){
+    var d = new Date(t), n = new Date(), p = function(x){ return (x < 10 ? '0' : '') + x; };
+    var hm = p(d.getHours()) + ':' + p(d.getMinutes());
+    if (d.toDateString() === n.toDateString()) return hm;
+    return p(d.getDate()) + '.' + p(d.getMonth() + 1) + ' ' + hm;
+  }
+  function mediaHtml(u, t){
+    if (!u) return '';
+    var s = esc(u);
+    return t === 'video' ? '<video src="' + s + '" controls playsinline preload="metadata" style="max-width:100%;border-radius:10px;display:block;margin-bottom:4px"></video>'
+      : '<a href="' + s + '" target="_blank" rel="noopener"><img src="' + s + '" alt="" style="max-width:100%;border-radius:10px;display:block;margin-bottom:4px"></a>';
+  }
+  async function pickMedia(file, folder){   // rasm yoki video -> {url,type}
+    var isVid = /^video\//.test(file.type) || /\.(mp4|mov|webm|m4v|3gp)$/i.test(file.name || '');
+    try {
+      var hd = new Uint8Array(await file.slice(0, 16).arrayBuffer()), ascii = String.fromCharCode.apply(null, hd);
+      if (ascii.slice(4, 8) === 'ftyp' && !/^ftyp(heic|heix|mif1|avif|msf1)/.test(ascii.slice(4, 12))) isVid = true;
+      else if (hd[0] === 0x1A && hd[1] === 0x45 && hd[2] === 0xDF && hd[3] === 0xA3) isVid = true;
+      else if ((hd[0] === 0xFF && hd[1] === 0xD8) || ascii.slice(1, 4) === 'PNG' || (ascii.slice(0, 4) === 'RIFF' && ascii.slice(8, 12) === 'WEBP') || ascii.slice(0, 3) === 'GIF') isVid = false;
+    } catch(e){}
+    if (isVid) {
+      if (file.size > 50 * 1024 * 1024) throw new Error('Video 50 MB dan katta. Kichikroq qiling');
+      var vt = /^video\//.test(file.type) ? file.type : (/\.webm$/i.test(file.name) ? 'video/webm' : /\.mov$/i.test(file.name) ? 'video/quicktime' : 'video/mp4');
+      return { url: await putAd(file, vt, folder, file.name), type: 'video' };
+    }
+    var im = await bigImage(file);
+    return { url: await putAd(im.blob, im.type, folder, file.name), type: 'image' };
+  }
+  async function snapFile(f){
+    var buf = await f.arrayBuffer(); return new File([buf], f.name || 'fayl', { type: f.type || '' });
+  }
+
+  /* --- chat --- */
+  async function loadChatThreads(){
+    try { var r = await sb.rpc('admin_chat_threads'); if (!r.error && r.data) { S.threads = r.data; S._chok = true; } else if (r.error) { S._chok = false; S._cherr = errMsg(r.error); } } catch(e){ S._chok = false; S._cherr = errMsg(e); }
+    var u = 0; (S.threads || []).forEach(function(t){ u += (+t.unread || 0); }); S.chUnread = u;
+    try { var r2 = await sb.rpc('admin_chat_unread'); if (!r2.error && r2.data != null) S.chUnread = +r2.data || 0; } catch(e){}
+  }
+  async function loadChatMsgs(){
+    if (!S.chatOpen) return;
+    try {
+      var r = await sb.from('chat_messages').select('*').eq('customer_id', S.chatOpen).order('id', { ascending: false }).limit(200);
+      if (!r.error && r.data) S.chatMsgs = r.data.slice().sort(function(a, b){ return a.id - b.id; });
+      var un = (S.chatMsgs || []).some(function(m){ return m.sender === 'customer' && !m.read_by_admin; });
+      if (un) { await sb.from('chat_messages').update({ read_by_admin: true }).eq('customer_id', S.chatOpen).eq('sender', 'customer'); loadChatThreads().then(renderNav); }
+    } catch(e){}
+  }
+  function chatHtml(){
+    if (S.chatOpen) {
+      var th = (S.threads || []).filter(function(t){ return t.customer_id === S.chatOpen; })[0] || S.chatWho || { name: 'Mijoz', phone: '' };
+      var h = '<button class="back" data-chback="1">← Barcha suhbatlar</button>' +
+        '<div class="card" style="padding:10px 12px"><b>' + esc(th.name) + '</b> <span class="muted">ID ' + (1000 + S.chatOpen) + (th.phone ? ' · +' + esc(String(th.phone).replace(/^\+/, '')) : '') + '</span></div>' +
+        '<div id="chlog" style="max-height:52vh;overflow-y:auto;padding:4px 2px;margin-bottom:8px">' +
+        ((S.chatMsgs || []).length ? S.chatMsgs.map(function(m){
+          var me = m.sender === 'admin';
+          return '<div style="display:flex;justify-content:' + (me ? 'flex-end' : 'flex-start') + ';margin:6px 0"><div style="max-width:82%;padding:8px 11px;border-radius:14px;background:' + (me ? '#2a2208' : 'var(--card2)') + ';border:1px solid ' + (me ? 'var(--gold)' : 'var(--line)') + ';font-size:14px;line-height:1.45;word-wrap:break-word">' +
+            mediaHtml(m.media_url, m.media_type) + (m.body ? '<div style="white-space:pre-wrap">' + esc(m.body) + '</div>' : '') +
+            '<div class="muted" style="font-size:10px;text-align:right;margin-top:2px">' + tmAgo(m.created_at) + '</div></div></div>';
+        }).join('') : '<div class="empty" style="padding:24px">Hali yozishmalar yo\'q</div>') + '</div>' +
+        (S.chMedia ? '<div class="card" style="padding:8px;display:flex;gap:8px;align-items:center">' + (S.chMedia.type === 'video' ? '🎬 Video tayyor' : '<img src="' + esc(S.chMedia.url) + '" style="height:46px;border-radius:8px" alt="">') + '<button class="btn small danger" data-chmedel="1" style="margin-left:auto">✕</button></div>' : '') +
+        (S._chbusy ? '<div class="muted" style="margin-bottom:6px">' + esc(S._chbusy) + '</div>' : '') +
+        '<div class="row" style="align-items:flex-end"><button class="btn small ghost" data-chattach="1" style="padding:12px">📎</button><textarea id="ch_text" rows="2" placeholder="Javob yozing..." style="margin:0;flex:1"></textarea><button class="btn small" id="ch_send" style="padding:12px">➤</button></div>' +
+        '<input type="file" id="ch_file" accept="image/*,video/mp4,video/webm,video/quicktime" style="display:none">';
+      return h;
+    }
+    if (S._chok === false) return '<div class="empty"><b>⚠️</b>Chat bazasi yoqilmagan.<br><span class="muted">features.sql ni Supabase SQL Editor da ishga tushiring.<br>' + esc(S._cherr || '') + '</span></div>';
+    var th2 = S.threads || [];
+    return '<div class="muted" style="margin-bottom:8px">Mijozlar «Yordam» bo\'limida yozgan xabarlar shu yerda. Suhbatni bosing va javob yozing.</div>' +
+      (th2.length ? th2.map(function(t){
+        var last = t.last_media ? (t.last_media === 'video' ? '🎬 Video' : '🖼 Rasm') + (t.last_body ? ' ' + t.last_body : '') : (t.last_body || '');
+        return '<div class="card mn" data-chopen="' + t.customer_id + '"><span class="ic">👤</span><div class="t"><b>' + esc(t.name) + ' <span class="muted">ID ' + (1000 + t.customer_id) + '</span></b><span class="muted" style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (t.last_sender === 'admin' ? 'Siz: ' : '') + esc(last) + '</span></div>' +
+          '<div style="text-align:right"><div class="muted" style="font-size:10px">' + tmAgo(t.last_at) + '</div>' + (+t.unread ? '<em class="dot" style="position:static;display:inline-grid;margin-top:3px">' + t.unread + '</em>' : '') + '</div></div>';
+      }).join('') : '<div class="empty"><b>💬</b>Hali hech kim yozmagan</div>');
+  }
+  function chatRender(keepText){
+    var b = $('chbox'); if (!b) return;
+    var tx = $('ch_text') ? $('ch_text').value : '';
+    b.innerHTML = chatHtml();
+    if ($('ch_text') && keepText) $('ch_text').value = tx;
+    var lg = $('chlog'); if (lg) lg.scrollTop = lg.scrollHeight;
+  }
+  async function chatOpen(id){
+    S.chatOpen = id; S.chatMsgs = []; S.chMedia = null; S._chbusy = '';
+    S.chatWho = (S.threads || []).filter(function(t){ return t.customer_id === id; })[0] || null;
+    chatRender(); await loadChatMsgs(); chatRender();
+  }
+  async function chatSend(){
+    var tx = $('ch_text'), body = tx ? tx.value.trim() : '';
+    if (!body && !S.chMedia) { toast('Xabar yozing'); return; }
+    if (body.length > 1000) { toast('Xabar 1000 belgidan oshmasin'); return; }
+    var row = { customer_id: S.chatOpen, sender: 'admin', body: body, media_url: S.chMedia ? S.chMedia.url : '', media_type: S.chMedia ? S.chMedia.type : '', read_by_admin: true };
+    var r = await sb.from('chat_messages').insert(row);
+    if (r.error) { toast('Yuborilmadi: ' + errMsg(r.error)); return; }
+    S.chMedia = null; if (tx) tx.value = '';
+    await loadChatMsgs(); chatRender(); loadChatThreads();
+  }
+  async function chatFile(f){
+    S._chbusy = 'Yuklanmoqda...'; chatRender(true);
+    try { var snap = await snapFile(f); S.chMedia = await pickMedia(snap, 'chat'); S._chbusy = ''; }
+    catch(e){ S._chbusy = ''; toast('Yuklanmadi: ' + errMsg(e)); }
+    chatRender(true);
+  }
+
+  /* --- xabar yuborish (bildirishnoma) --- */
+  async function loadAnns(){
+    try { var r = await sb.from('announcements').select('*').order('id', { ascending: false }).limit(50); if (!r.error) { S.anns = r.data || []; S._anerr = ''; } else S._anerr = errMsg(r.error); } catch(e){ S._anerr = errMsg(e); }
+  }
+  function notifyHtml(){
+    if (S._anerr) return '<div class="empty"><b>⚠️</b>Xabar bazasi yoqilmagan.<br><span class="muted">features.sql ni ishga tushiring. ' + esc(S._anerr) + '</span></div>';
+    var nm = S.nfMedia;
+    return '<div class="muted" style="margin-bottom:8px">Yuborilgan xabar barcha mijozlarda tepadagi 🔔 «Xabarlar» tugmasida ko\'rinadi. Rasm yoki video qo\'shishingiz mumkin.</div>' +
+      '<label>Sarlavha</label><input id="nf_title" maxlength="80" placeholder="Masalan: Yangi mahsulotlar keldi!">' +
+      '<label>Matn</label><textarea id="nf_body" rows="4" maxlength="1000" placeholder="Xabar matni..."></textarea>' +
+      '<label>Rasm yoki video (ixtiyoriy)</label>' +
+      (nm ? '<div class="card" style="padding:8px">' + mediaHtml(nm.url, nm.type) + '<button class="btn small danger" data-nfmedel="1">O\'chirish</button></div>' : '<button class="btn ghost" data-nfattach="1" style="margin-bottom:10px">📎 Rasm / video tanlash</button>') +
+      (S._nfbusy ? '<div class="muted" style="margin-bottom:8px">' + esc(S._nfbusy) + '</div>' : '') +
+      '<input type="file" id="nf_file" accept="image/*,video/mp4,video/webm,video/quicktime" style="display:none">' +
+      '<label>Havola (ixtiyoriy)</label><input id="nf_link" placeholder="t.me/kanal yoki https://...">' +
+      '<label>Amal qilish muddati (ixtiyoriy)</label><input id="nf_exp" type="date">' +
+      '<label style="margin:2px 0 12px;font-size:14px;color:var(--text)"><input type="checkbox" id="nf_popup"> Ilova ochilganda darrov oyna bo\'lib chiqsin</label>' +
+      '<button class="btn" id="nf_send">📣 Hammaga yuborish</button>' +
+      '<h2>Yuborilganlar</h2>' +
+      ((S.anns || []).length ? S.anns.map(function(a){
+        return '<div class="card"><div class="row sp"><b>' + esc(a.title || 'Xabar') + '</b><span class="muted">' + tmAgo(a.created_at) + '</span></div>' +
+          (a.media_url ? '<div style="margin-top:6px;max-width:220px">' + mediaHtml(a.media_url, a.media_type) + '</div>' : '') +
+          (a.body ? '<div class="muted" style="margin:4px 0;white-space:pre-wrap">' + esc(a.body) + '</div>' : '') +
+          '<div class="row sp" style="margin-top:6px"><label style="margin:0;font-size:13px;color:var(--text)"><input type="checkbox" data-nftog="' + a.id + '"' + (a.active ? ' checked' : '') + '> Ko\'rinsin</label><button class="btn small danger" data-nfdel="' + a.id + '">🗑</button></div></div>';
+      }).join('') : '<div class="muted">Hali xabar yuborilmagan</div>');
+  }
+  function notifyRender(){ var b = $('nfbox'); if (!b) return; var k = { t: $('nf_title') && $('nf_title').value, b: $('nf_body') && $('nf_body').value, l: $('nf_link') && $('nf_link').value, e: $('nf_exp') && $('nf_exp').value, p: $('nf_popup') && $('nf_popup').checked }; b.innerHTML = notifyHtml(); if ($('nf_title')) { $('nf_title').value = k.t || ''; $('nf_body').value = k.b || ''; $('nf_link').value = k.l || ''; $('nf_exp').value = k.e || ''; $('nf_popup').checked = !!k.p; } }
+  async function nfFile(f){
+    S._nfbusy = 'Yuklanmoqda...'; notifyRender();
+    try { var snap = await snapFile(f); S.nfMedia = await pickMedia(snap, 'notify'); S._nfbusy = ''; toast('Yuklandi'); }
+    catch(e){ S._nfbusy = ''; toast('Yuklanmadi: ' + errMsg(e)); }
+    notifyRender();
+  }
+  async function nfSend(){
+    var title = $('nf_title').value.trim(), body = $('nf_body').value.trim(), link = normLink($('nf_link').value);
+    if (!title && !body && !S.nfMedia) { toast('Sarlavha, matn yoki rasm kiriting'); return; }
+    if (link === null) { toast('Havola noto\'g\'ri. Masalan: t.me/kanal'); return; }
+    var exp = $('nf_exp').value ? new Date($('nf_exp').value + 'T23:59:59').toISOString() : null;
+    if (!confirm('Bu xabar BARCHA mijozlarga yuboriladi. Yuboraymi?')) return;
+    var row = { title: title, body: body, media_url: S.nfMedia ? S.nfMedia.url : '', media_type: S.nfMedia ? S.nfMedia.type : '', link: link, popup: $('nf_popup').checked, active: true, expires_at: exp };
+    var r = await sb.from('announcements').insert(row);
+    if (r.error) { toast('Yuborilmadi: ' + errMsg(r.error)); return; }
+    S.nfMedia = null; await loadAnns(); S.nfClear = true; notifyRender();
+    ['nf_title', 'nf_body', 'nf_link', 'nf_exp'].forEach(function(i){ if ($(i)) $(i).value = ''; }); if ($('nf_popup')) $('nf_popup').checked = false;
+    toast('Yuborildi. Mijozlarda 🔔 da ko\'rinadi');
+  }
+
+  /* --- sharhlar --- */
+  async function loadRevs(){
+    try { var r = await sb.rpc('admin_reviews'); if (!r.error) { S.revs = r.data || []; S._rverr = ''; } else S._rverr = errMsg(r.error); } catch(e){ S._rverr = errMsg(e); }
+  }
+  function reviewsAdmHtml(){
+    if (S._rverr) return '<div class="empty"><b>⚠️</b>Sharhlar bazasi yoqilmagan.<br><span class="muted">features.sql ni ishga tushiring. ' + esc(S._rverr) + '</span></div>';
+    var l = S.revs || [];
+    return '<div class="muted" style="margin-bottom:8px">Mijozlar yozgan sharhlar. Yoqmaganini yashirishingiz yoki javob yozishingiz mumkin.</div>' +
+      (l.length ? l.map(function(r){
+        return '<div class="card"' + (r.hidden ? ' style="opacity:.6"' : '') + '><div class="row sp"><b>' + esc(r.product_name) + '</b><span class="pill" style="color:var(--gold2)">' + '★'.repeat(+r.rating || 0) + '</span></div>' +
+          '<div class="muted">' + esc(r.customer_name) + ' · +' + esc(String(r.customer_phone || '').replace(/^\+/, '')) + ' · ' + tmAgo(r.created_at) + (r.hidden ? ' · 🙈 yashirilgan' : '') + '</div>' +
+          (r.body ? '<div style="margin:6px 0;white-space:pre-wrap">' + esc(r.body) + '</div>' : '') +
+          '<label>Sizning javobingiz (mijozlar ko\'radi)</label><textarea rows="2" data-rvrep="' + r.id + '" maxlength="500" placeholder="Javob yozing...">' + esc(r.admin_reply || '') + '</textarea>' +
+          '<div class="row"><button class="btn small" data-rvsave="' + r.id + '">Javobni saqlash</button><button class="btn small ghost" data-rvhide="' + r.id + '">' + (r.hidden ? 'Ko\'rsatish' : 'Yashirish') + '</button><button class="btn small danger" data-rvdel="' + r.id + '">🗑</button></div></div>';
+      }).join('') : '<div class="empty"><b>⭐</b>Hali sharh yo\'q</div>');
+  }
+  function rvRender(){ var b = $('rvbox'); if (b) b.innerHTML = reviewsAdmHtml(); }
+  async function rvAction(t){
+    var id, r;
+    if (t.dataset.rvsave) { id = +t.dataset.rvsave; var ta = document.querySelector('[data-rvrep="' + id + '"]'); r = await sb.from('reviews').update({ admin_reply: ta.value.trim() }).eq('id', id); if (r.error) { toast('Xatolik: ' + errMsg(r.error)); return; } toast('Javob saqlandi'); }
+    else if (t.dataset.rvhide) { id = +t.dataset.rvhide; var cur = (S.revs || []).filter(function(x){ return x.id === id; })[0]; r = await sb.from('reviews').update({ hidden: !(cur && cur.hidden) }).eq('id', id); if (r.error) { toast('Xatolik: ' + errMsg(r.error)); return; } toast('Bajarildi'); }
+    else if (t.dataset.rvdel) { id = +t.dataset.rvdel; if (!confirm('Sharh o\'chirilsinmi?')) return; r = await sb.from('reviews').delete().eq('id', id); if (r.error) { toast('Xatolik: ' + errMsg(r.error)); return; } toast('O\'chirildi'); }
+    await loadRevs(); rvRender();
+  }
+
+  /* --- trek raqam --- */
+  async function saveTrack(id, val){
+    var v = String(val || '').replace(/\s+/g, '').slice(0, 60);
+    var r = await sb.from('orders').update({ track: v }).eq('id', id);
+    if (r.error) { toast('Xatolik: ' + errMsg(r.error) + ' (features.sql ishga tushirilganmi?)'); return; }
+    var o = S.orders.filter(function(x){ return x.id === id; })[0]; if (o) o.track = v;
+    toast(v ? 'Trek raqam saqlandi. Mijoz ko\'radi' : 'Trek raqam o\'chirildi');
+  }
+
   /* ---------- Matnlar ---------- */
   var SUBS = [
-    ['home', '🏠', 'Asosiy sahifa'], ['coupons', '🎟', 'Kuponlar'], ['ads', '📢', 'Reklama'], ['pay', '💳', "To'lov"],
+    ['chat', '💬', 'Yordam (chat)'], ['home', '🏠', 'Asosiy sahifa'], ['coupons', '🎟', 'Kuponlar'], ['ads', '📢', 'Reklama'], ['notify', '📣', 'Xabar yuborish'], ['reviews', '⭐', 'Sharhlar'], ['pay', '💳', "To'lov"],
     ['cats', '🗂', 'Kategoriyalar'], ['info', 'ℹ️', "«Ma'lumot» bo'limi"], ['calc', '💱', 'Yuan kursi']
   ];
   function subStatus(k){
@@ -689,6 +876,9 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
     if (k === 'home') return esc(sh.name || 'qSHOP') + ' · ' + (gm() ? 'guruh rejimi yoqilgan' : 'oddiy do\'kon');
     if (k === 'coupons') { var a = (S.coupons || []).filter(function(c){ return c.active; }).length; return S._cperr ? 'bazani yoqish kerak' : a + ' ta faol · jami ' + (S.coupons || []).length; }
     if (k === 'ads') { var n = 0; ['top', 'feed', 'info'].forEach(function(x){ n += ((S.ads || {})[x] || []).length; }); return n + ' ta reklama'; }
+    if (k === 'chat') return S._chok === false ? 'bazani yoqish kerak' : ((S.chUnread || 0) ? '<b style="color:var(--red)">' + S.chUnread + ' ta o\'qilmagan xabar</b>' : (S.threads || []).length + ' ta suhbat');
+    if (k === 'notify') return S._anerr ? 'bazani yoqish kerak' : (S.anns || []).length + ' ta yuborilgan';
+    if (k === 'reviews') return S._rverr ? 'bazani yoqish kerak' : (S.revs || []).length + ' ta sharh';
     if (k === 'pay') return pay.card ? 'karta kiritilgan · chek ' + (pay.required === false ? 'majburiy emas' : 'majburiy') : 'karta kiritilmagan';
     if (k === 'cats') return (S.cats || []).length + ' ta kategoriya';
     if (k === 'info') return (inf.steps || []).length + ' ta qadam' + (inf.note ? ' · eslatma bor' : '');
@@ -696,7 +886,7 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
     return '';
   }
   function viewTexts(){
-    var ver = '<div class="muted" style="text-align:center;margin:22px 0 8px;font-size:12px">Admin ilova versiyasi: 2026.10.27-j (sozlamalar)</div>';
+    var ver = '<div class="muted" style="text-align:center;margin:22px 0 8px;font-size:12px">Admin ilova versiyasi: 2026.10.27-k (yordam, sharh, xabar, trek)</div>';
     if (!S.sub) {
       return '<h2 style="margin-top:4px">Sozlamalar</h2>' + SUBS.map(function(x){
         return '<div class="card mn" data-sub="' + x[0] + '"><span class="ic">' + x[1] + '</span><div class="t"><b>' + x[2] + '</b><span class="muted">' + subStatus(x[0]) + '</span></div><span class="go">›</span></div>';
@@ -716,6 +906,9 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
       '<label style="margin:6px 0 4px;font-size:14px;color:var(--text)"><input type="checkbox" id="tx_gm"' + (gm() ? ' checked' : '') + '> Guruh rejimi</label>' +
       '<div class="muted" style="margin-bottom:14px">O\'chirilsa: ilova oddiy do\'kon bo\'ladi, mahsulotda bitta narx ko\'rinadi, guruhga qo\'shilish tugmasi yo\'qoladi. Banner va «Ma\'lumot» matnlarini ham mosiga o\'zgartiring.</div>' +
       '<button class="btn" id="sv_home">Saqlash</button>';
+    else if (S.sub === 'chat') h += '<div id="chbox">' + chatHtml() + '</div>';
+    else if (S.sub === 'notify') h += '<div id="nfbox">' + notifyHtml() + '</div>';
+    else if (S.sub === 'reviews') h += '<div id="rvbox">' + reviewsAdmHtml() + '</div>';
     else if (S.sub === 'coupons') h += '<div id="cpadm">' + couponsHtml() + '</div>';
     else if (S.sub === 'ads') h += '<div id="adbox">' + adsHtml() + '</div>';
     else if (S.sub === 'pay') h +=
@@ -877,7 +1070,7 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
 
   /* ---------- Hodisalar ---------- */
   document.addEventListener('click', async function(e){
-    var t = e.target.closest('[data-sub],[id^=sv_],[data-cpdel],#cf_add,[data-adcopy],[data-adadd],[data-addel],[data-admv],#ad_save,[data-tab],[data-cust],[data-more],[data-gocust],[data-custedit],#ce_save,[data-rcp],[data-resetpin],[data-block],[data-filter],[data-edit],[data-closemodal],[data-pickimg],[data-pickgal],[data-rmgal],[data-rmimg],[data-delprod],[data-delorder],#l_go,#pf_save,[data-pickgal],[data-rmgal],#cc_use,#cc_save,#tx_save,#logout,#refresh');
+    var t = e.target.closest('[data-chopen],[data-chback],[data-chattach],[data-chmedel],#ch_send,[data-nfattach],[data-nfmedel],#nf_send,[data-nfdel],[data-rvsave],[data-rvhide],[data-rvdel],[data-sub],[id^=sv_],[data-cpdel],#cf_add,[data-adcopy],[data-adadd],[data-addel],[data-admv],#ad_save,[data-tab],[data-cust],[data-more],[data-gocust],[data-custedit],#ce_save,[data-rcp],[data-resetpin],[data-block],[data-filter],[data-edit],[data-closemodal],[data-pickimg],[data-pickgal],[data-rmgal],[data-rmimg],[data-delprod],[data-delorder],#l_go,#pf_save,[data-pickgal],[data-rmgal],#cc_use,#cc_save,#tx_save,#logout,#refresh');
     if (!t) return;
     if (t.id === 'l_go') return doLogin();
     if (t.id === 'logout') return logout();
@@ -903,7 +1096,17 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
     if (t.id === 'pf_save') return saveProduct();
     if (t.id === 'cc_use') { var c = calcVals(); if (c.sell > 0) { $('pf_price').value = c.sell; toast('Narx qo\'yildi'); } else toast('Avval ¥ narxini kiriting'); return; }
     if (t.id === 'cc_save') return calcSave();
-    if (t.dataset.sub !== undefined) { S.sub = t.dataset.sub; render(); window.scrollTo(0, 0); return; }
+    if (t.dataset.chopen) return chatOpen(+t.dataset.chopen);
+    if (t.dataset.chback) { S.chatOpen = null; chatRender(); loadChatThreads().then(function(){ chatRender(); renderNav(); }); return; }
+    if (t.dataset.chattach) { $('ch_file').click(); return; }
+    if (t.dataset.chmedel) { S.chMedia = null; chatRender(true); return; }
+    if (t.id === 'ch_send') return chatSend();
+    if (t.dataset.nfattach) { $('nf_file').click(); return; }
+    if (t.dataset.nfmedel) { S.nfMedia = null; notifyRender(); return; }
+    if (t.id === 'nf_send') return nfSend();
+    if (t.dataset.nfdel) { if (!confirm('Xabar o\'chirilsinmi? Mijozlardan ham yo\'qoladi.')) return; var dr = await sb.from('announcements').delete().eq('id', +t.dataset.nfdel); if (dr.error) { toast('Xatolik: ' + errMsg(dr.error)); return; } await loadAnns(); notifyRender(); return; }
+    if (t.dataset.rvsave || t.dataset.rvhide || t.dataset.rvdel) return rvAction(t);
+    if (t.dataset.sub !== undefined) { S.sub = t.dataset.sub; S.chatOpen = null; if (S.sub === 'chat') { loadChatThreads().then(function(){ chatRender(); renderNav(); }); } if (S.sub === 'notify') loadAnns().then(notifyRender); if (S.sub === 'reviews') loadRevs().then(rvRender); render(); window.scrollTo(0, 0); return; }
     if (/^sv_/.test(t.id)) return saveSub(t.id.slice(3));
     if (t.id === 'cf_add') return cpAdd();
     if (t.dataset.cpdel) return cpDel(+t.dataset.cpdel);
@@ -928,11 +1131,27 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
     if (t.dataset && t.dataset.adlink) { var q2 = t.dataset.adlink.split(':'), nl = normLink(t.value); if (nl === null) { toast('Havola noto\'g\'ri. Masalan: t.me/kanal yoki https://sayt.uz'); S.ads[q2[0]][+q2[1]].link = t.value.trim(); return; } t.value = nl; S.ads[q2[0]][+q2[1]].link = nl; return; }
     if (t.dataset && t.dataset.status) return setStatus(+t.dataset.status, t.value);
     if (t.dataset && t.dataset.paid) return setPaid(+t.dataset.paid, t.checked);
+    if (t.id === 'ch_file' && t.files && t.files[0]) { var cf = t.files[0]; chatFile(cf); t.value = ''; return; }
+    if (t.id === 'nf_file' && t.files && t.files[0]) { var nf = t.files[0]; nfFile(nf); t.value = ''; return; }
+    if (t.dataset && t.dataset.nftog) { var tg = await sb.from('announcements').update({ active: t.checked }).eq('id', +t.dataset.nftog); if (tg.error) toast('Xatolik: ' + errMsg(tg.error)); else toast(t.checked ? 'Ko\'rinadi' : 'Yashirildi'); return; }
+    if (t.dataset && t.dataset.track) return saveTrack(+t.dataset.track, t.value);
     if (t.dataset && t.dataset.ship) return saveShipping(+t.dataset.ship, t.value);
     if (t.dataset && t.dataset.anote) return saveAdminNote(+t.dataset.anote, t.value.trim());
     if (t.id === 'pf_file' && t.files && t.files[0]) { uploadImage(t.files[0]); t.value = ''; }
     if (t.id === 'pf_file2' && t.files && t.files.length) { uploadGallery(Array.prototype.slice.call(t.files)); t.value = ''; }
   });
+  setInterval(async function(){
+    if (document.hidden || !$('view')) return;
+    try {
+      var before = S.chUnread || 0, r = await sb.rpc('admin_chat_unread');
+      if (!r.error && r.data != null) { S.chUnread = +r.data || 0; renderNav(); }
+      if (S.tab === 'texts' && S.sub === 'chat' && $('chbox')) {
+        var act = document.activeElement, typing = act && act.id === 'ch_text' && act.value;
+        if (S.chatOpen) { var n0 = (S.chatMsgs || []).length, l0 = n0 ? S.chatMsgs[n0 - 1].id : 0; await loadChatMsgs(); var n1 = (S.chatMsgs || []).length; if (n1 && S.chatMsgs[n1 - 1].id !== l0) chatRender(true); }
+        else if (!typing) { await loadChatThreads(); chatRender(); }
+      } else if (S.chUnread > before && S.tab === 'texts' && !S.sub) { loadChatThreads().then(function(){ render(); }); }
+    } catch(e){}
+  }, 6000);
   setInterval(async function(){
     if (document.hidden || !$('view') || S.tab !== 'orders' || $('modal').classList.contains('show')) return;
     var active = document.activeElement; if (active && /INPUT|TEXTAREA|SELECT/.test(active.tagName)) return;

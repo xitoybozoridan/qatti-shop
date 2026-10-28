@@ -76,6 +76,12 @@ a{color:var(--gold2)}
 .days i{display:block;background:linear-gradient(180deg,var(--gold2),var(--gold));border-radius:5px 5px 0 0;min-height:3px;margin-bottom:3px}
 .ord{margin-top:10px}.ord.item{border-top:1px dashed var(--line);padding-top:8px}
 .rcp{width:72px;height:72px;object-fit:cover;border-radius:10px;border:1px solid var(--line);cursor:pointer}
+.oth{width:52px;height:52px;border-radius:10px;object-fit:cover;border:1px solid var(--line);flex:none;background:var(--card2);display:grid;place-items:center;font-size:24px;cursor:pointer}
+.ohead{cursor:pointer;display:flex;gap:10px;align-items:center;margin-top:8px}
+.ohead .tx{flex:1;min-width:0;font-size:13px;line-height:1.4}
+.ohead .tx b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:14px}
+.ohead .ch{color:var(--muted);font-size:20px;transition:transform .15s}
+.ohead .ch.up{transform:rotate(90deg)}
 .rcbig{position:fixed;inset:0;background:rgba(0,0,0,.94);z-index:80;display:grid;place-items:center;padding:10px;overflow:auto}.rcbig img{max-width:100%;max-height:100%;object-fit:contain}
 .kv{font-size:14px;margin-bottom:3px}.kv span{color:var(--muted)}
 button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
@@ -102,7 +108,7 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
     shipped: ["Yo'lda", '#b48cff'], arrived: ['Keldi', '#3ecf8e'], done: ['Yakunlandi', '#3ecf8e'], cancelled: ['Bekor qilindi', '#9a978c'] };
   var sb = null;
   try { sb = window.supabase.createClient(window.QSHOP.SUPABASE_URL, window.QSHOP.SUPABASE_KEY); } catch(e){}
-  var S = { sub: '', coupons: [], ads: { top: [], feed: [], info: [] }, adstats: {}, _adslot: '', tab: 'orders', orders: [], products: [], shop: {}, info: {}, cats: [], pay: {}, shown: 30, cshown: 30, cq: '', copen: '', accts: [], calc: { rate: 1750, markup: 30 }, filter: 'all', editing: null, busy: false };
+  var S = { oopen: {}, sub: '', coupons: [], ads: { top: [], feed: [], info: [] }, adstats: {}, _adslot: '', tab: 'orders', orders: [], products: [], shop: {}, info: {}, cats: [], pay: {}, shown: 30, cshown: 30, cq: '', copen: '', accts: [], calc: { rate: 1750, markup: 30 }, filter: 'all', editing: null, busy: false };
 
   function toast(t){ var el = $('toast'); el.textContent = t; el.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(function(){ el.classList.remove('show'); }, 2600); }
   function fmtDate(iso){ try { return new Date(iso).toLocaleString('ru', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); } catch(e){ return ''; } }
@@ -186,6 +192,15 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
   }
 
   /* ---------- Buyurtmalar ---------- */
+  function prodOf(i){ return S.products.filter(function(x){ return x.id === i.id; })[0] || null; }
+  function othumb(i, big){
+    var p = prodOf(i), u = p && p.image_url ? p.image_url : '';
+    return u ? '<img class="oth" loading="lazy" data-oimg="' + esc(u) + '" src="' + esc(u) + '" alt="">' : '<div class="oth">' + esc((p && p.emoji) || '📦') + '</div>';
+  }
+  function showBig(u){
+    var ov = document.createElement('div'); ov.className = 'rcbig'; ov.innerHTML = '<img src="' + esc(u) + '" alt="">'; document.body.appendChild(ov);
+    ov.addEventListener('click', function(){ ov.remove(); });
+  }
   function viewOrders(){
     var counts = { all: S.orders.length };
     Object.keys(STATUS).forEach(function(k){ counts[k] = S.orders.filter(function(o){ return o.status === k; }).length; });
@@ -197,12 +212,19 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
     return chips + list.map(function(o){
       var st = STATUS[o.status] || [o.status, '#9a978c'];
       var d = phoneDigits(o.phone);
-      return '<div class="card"><div class="row sp"><b>#' + o.id + '</b><span class="muted">' + fmtDate(o.created_at) + '</span><span class="pill" style="color:' + st[1] + '">' + esc(st[0]) + '</span></div>' +
+      var its = o.items || [], open = !!S.oopen[o.id], first = its[0] ? splitOpt(its[0].name) : { name: '', opts: [] };
+      var sum = '<div class="ohead" data-otog="' + o.id + '">' + (its[0] ? othumb(its[0]) : '') +
+        '<div class="tx"><b>' + esc(first.name) + (its.length > 1 ? ' <span class="muted">+' + (its.length - 1) + ' ta</span>' : '') + '</b>' +
+        '<span class="muted">' + esc(o.customer_name) + ' · ' + esc(its.map(function(i){ return i.qty + ' dona'; }).join(', ')) + '</span><br>' +
+        '<b style="color:var(--gold2);display:inline">' + money((+o.total || 0) + (+o.shipping || 0)) + '</b> <span class="muted">' + (o.paid ? '· ✅ to\'langan' : o.receipt_thumb ? '· 🧾 chek bor' : '') + (o.track ? ' · 📮' : '') + '</span></div>' +
+        '<span class="ch' + (open ? ' up' : '') + '">›</span></div>';
+      if (!open) return '<div class="card"><div class="row sp"><b>#' + o.id + '</b><span class="muted">' + fmtDate(o.created_at) + '</span><span class="pill" style="color:' + st[1] + '">' + esc(st[0]) + '</span></div>' + sum + '</div>';
+      return '<div class="card"><div class="row sp"><b>#' + o.id + '</b><span class="muted">' + fmtDate(o.created_at) + '</span><span class="pill" style="color:' + st[1] + '">' + esc(st[0]) + '</span></div>' + sum +
         '<div class="ord">' + kv('Ism Familiya', o.customer_name) + (o.customer_id ? '<div class="kv"><span>Mijoz ID:</span> <b>' + (1000 + o.customer_id) + '</b> <button class="btn small ghost" style="padding:1px 8px;font-size:12px" data-gocust="' + o.customer_id + '">kartani ochish</button></div>' : '') + kv('Telefon', o.phone) + kv('Manzil', o.address) + (o.note ? kv('Izoh', o.note) : '') + '</div>' +
         (o.items || []).map(function(i){
           var sp = splitOpt(i.name);
-          return '<div class="ord item">' + kv('Mahsulot', sp.name) + sp.opts.map(function(x){ var k = x.indexOf(':'); return kv(x.slice(0, k), x.slice(k + 1).trim()); }).join('') +
-            kv('Soni', i.qty + ' dona' + (i.group ? ' (guruh)' : '')) + kv('Narxi', money(i.unit * i.qty)) + '</div>';
+          return '<div class="ord item"><div class="row" style="align-items:flex-start;gap:10px">' + othumb(i) + '<div style="flex:1;min-width:0">' + kv('Mahsulot', sp.name) + sp.opts.map(function(x){ var k = x.indexOf(':'); return kv(x.slice(0, k), x.slice(k + 1).trim()); }).join('') +
+            kv('Soni', i.qty + ' dona' + (i.group ? ' (guruh)' : '')) + kv('Narxi', money(i.unit * i.qty)) + '</div></div></div>';
         }).join('') +
         (o.receipt_thumb ? '<div class="ord item"><div class="muted" style="margin-bottom:6px">To\'lov cheki (kattalashtirish uchun bosing):</div><img class="rcp" loading="lazy" decoding="async" data-rcp="' + o.id + '" src="' + esc(o.receipt_thumb) + '" alt="chek"></div>' : (S.pay && S.pay.card ? '<div class="ord item"><span class="muted">To\'lov cheki: </span><b style="color:#ff4d4f">yuklanmagan</b></div>' : '')) +
         '<label style="margin:8px 0;font-size:14px;color:var(--text)"><input type="checkbox" data-paid="' + o.id + '"' + (o.paid ? ' checked' : '') + '> ✅ To\'lov qabul qilindi</label>' +
@@ -886,7 +908,7 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
     return '';
   }
   function viewTexts(){
-    var ver = '<div class="muted" style="text-align:center;margin:22px 0 8px;font-size:12px">Admin ilova versiyasi: 2026.10.27-k (yordam, sharh, xabar, trek)</div>';
+    var ver = '<div class="muted" style="text-align:center;margin:22px 0 8px;font-size:12px">Admin ilova versiyasi: 2026.10.28-l (buyurtma kartasi, aralash)</div>';
     if (!S.sub) {
       return '<h2 style="margin-top:4px">Sozlamalar</h2>' + SUBS.map(function(x){
         return '<div class="card mn" data-sub="' + x[0] + '"><span class="ic">' + x[1] + '</span><div class="t"><b>' + x[2] + '</b><span class="muted">' + subStatus(x[0]) + '</span></div><span class="go">›</span></div>';
@@ -1070,7 +1092,7 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
 
   /* ---------- Hodisalar ---------- */
   document.addEventListener('click', async function(e){
-    var t = e.target.closest('[data-chopen],[data-chback],[data-chattach],[data-chmedel],#ch_send,[data-nfattach],[data-nfmedel],#nf_send,[data-nfdel],[data-rvsave],[data-rvhide],[data-rvdel],[data-sub],[id^=sv_],[data-cpdel],#cf_add,[data-adcopy],[data-adadd],[data-addel],[data-admv],#ad_save,[data-tab],[data-cust],[data-more],[data-gocust],[data-custedit],#ce_save,[data-rcp],[data-resetpin],[data-block],[data-filter],[data-edit],[data-closemodal],[data-pickimg],[data-pickgal],[data-rmgal],[data-rmimg],[data-delprod],[data-delorder],#l_go,#pf_save,[data-pickgal],[data-rmgal],#cc_use,#cc_save,#tx_save,#logout,#refresh');
+    var t = e.target.closest('[data-oimg],[data-otog],[data-chopen],[data-chback],[data-chattach],[data-chmedel],#ch_send,[data-nfattach],[data-nfmedel],#nf_send,[data-nfdel],[data-rvsave],[data-rvhide],[data-rvdel],[data-sub],[id^=sv_],[data-cpdel],#cf_add,[data-adcopy],[data-adadd],[data-addel],[data-admv],#ad_save,[data-tab],[data-cust],[data-more],[data-gocust],[data-custedit],#ce_save,[data-rcp],[data-resetpin],[data-block],[data-filter],[data-edit],[data-closemodal],[data-pickimg],[data-pickgal],[data-rmgal],[data-rmimg],[data-delprod],[data-delorder],#l_go,#pf_save,[data-pickgal],[data-rmgal],#cc_use,#cc_save,#tx_save,#logout,#refresh');
     if (!t) return;
     if (t.id === 'l_go') return doLogin();
     if (t.id === 'logout') return logout();
@@ -1096,6 +1118,8 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
     if (t.id === 'pf_save') return saveProduct();
     if (t.id === 'cc_use') { var c = calcVals(); if (c.sell > 0) { $('pf_price').value = c.sell; toast('Narx qo\'yildi'); } else toast('Avval ¥ narxini kiriting'); return; }
     if (t.id === 'cc_save') return calcSave();
+    if (t.dataset.oimg) return showBig(t.dataset.oimg);
+    if (t.dataset.otog) { var oid = +t.dataset.otog; S.oopen[oid] = !S.oopen[oid]; var y0 = window.scrollY; render(); window.scrollTo(0, y0); return; }
     if (t.dataset.chopen) return chatOpen(+t.dataset.chopen);
     if (t.dataset.chback) { S.chatOpen = null; chatRender(); loadChatThreads().then(function(){ chatRender(); renderNav(); }); return; }
     if (t.dataset.chattach) { $('ch_file').click(); return; }

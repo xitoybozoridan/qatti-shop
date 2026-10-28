@@ -795,10 +795,11 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
     if (!body && !S.chMedia) { toast('Xabar yozing'); return; }
     if (body.length > 1000) { toast('Xabar 1000 belgidan oshmasin'); return; }
     var row = { customer_id: S.chatOpen, sender: 'admin', body: body, media_url: S.chMedia ? S.chMedia.url : '', media_type: S.chMedia ? S.chMedia.type : '', read_by_admin: true };
+    var tmp = { id: 9e15 + Date.now(), customer_id: S.chatOpen, sender: 'admin', body: body, media_url: row.media_url, media_type: row.media_type, created_at: new Date().toISOString() };
+    (S.chatMsgs = S.chatMsgs || []).push(tmp); var oldM = S.chMedia; S.chMedia = null; if (tx) tx.value = ''; chatRender(); if ($('ch_text')) $('ch_text').focus();
     var r = await sb.from('chat_messages').insert(row);
-    if (r.error) { toast('Yuborilmadi: ' + errMsg(r.error)); return; }
-    S.chMedia = null; if (tx) tx.value = '';
-    await loadChatMsgs(); chatRender(); loadChatThreads();
+    if (r.error) { S.chatMsgs = S.chatMsgs.filter(function(m){ return m !== tmp; }); S.chMedia = oldM; chatRender(); if ($('ch_text')) $('ch_text').value = body; toast('Yuborilmadi: ' + errMsg(r.error)); return; }
+    await loadChatMsgs(); chatRender(true); loadChatThreads();
   }
   async function chatFile(f){
     S._chbusy = 'Yuklanmoqda...'; chatRender(true);
@@ -908,7 +909,7 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
     return '';
   }
   function viewTexts(){
-    var ver = '<div class="muted" style="text-align:center;margin:22px 0 8px;font-size:12px">Admin ilova versiyasi: 2026.10.28-l (buyurtma kartasi, aralash)</div>';
+    var ver = '<div class="muted" style="text-align:center;margin:22px 0 8px;font-size:12px">Admin ilova versiyasi: 2026.10.28-m (tez chat)</div>';
     if (!S.sub) {
       return '<h2 style="margin-top:4px">Sozlamalar</h2>' + SUBS.map(function(x){
         return '<div class="card mn" data-sub="' + x[0] + '"><span class="ic">' + x[1] + '</span><div class="t"><b>' + x[2] + '</b><span class="muted">' + subStatus(x[0]) + '</span></div><span class="go">›</span></div>';

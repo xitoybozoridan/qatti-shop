@@ -1047,7 +1047,16 @@ html[data-theme=light] .btn.ghost{color:var(--text)}
       var d = fmtDay(m.created_at); if (d !== last) { h += '<div class="cday">' + d + '</div>'; last = d; }
       h += chatBubble(m);
     });
+    (state.chatPend || []).forEach(function(m){
+      var mine = '<div class="cb me">' + (m.img ? '<img class="cm" src="' + esc(m.img) + '" alt="">' : '') + (m.body ? '<div class="ct">' + autolink(m.body) + '</div>' : '') +
+        '<div class="cd">' + (m.err ? '<span style="color:#ffd0d0">❗ Yuborilmadi</span> <a href="#" data-chretry="' + m.k + '" style="color:inherit;text-decoration:underline">Qayta</a> · <a href="#" data-chdrop="' + m.k + '" style="color:inherit;text-decoration:underline">O\'chirish</a>' : (m.done ? '✓' : '⏳')) + '</div></div>';
+      h += mine;
+    });
     return h;
+  }
+  function chatRedraw(scroll){
+    var box = $('chatlist'); if (!box) return;
+    box.innerHTML = chatListHtml(); if (scroll) box.scrollTop = box.scrollHeight;
   }
   function renderChat(){
     if (!state.me) return '<div class="card" style="padding:16px"><b>Chat uchun avval kiring</b><p class="hint" style="margin:6px 0 12px">Telefon raqam va PIN bilan bir daqiqada kirasiz. Yozgan xabarlaringiz shu yerda saqlanadi va javob ham shu yerda chiqadi.</p><button class="btn" data-tab="profile">Kirish / Ro\'yxatdan o\'tish</button></div>';
@@ -1059,7 +1068,7 @@ html[data-theme=light] .btn.ghost{color:var(--text)}
     clearInterval(state.chT); state.chT = null;
     if (state.tab === 'info' && state.help === 'chat' && state.me && state.token && sb) {
       chatLoad(true);
-      state.chT = setInterval(function(){ if (!document.hidden && state.tab === 'info' && state.help === 'chat') chatLoad(false); }, 5000);
+      state.chT = setInterval(function(){ if (!document.hidden && state.tab === 'info' && state.help === 'chat') chatLoad(false); }, 3000);
     }
   }
   async function chatLoad(first, forceScroll){
@@ -1069,10 +1078,13 @@ html[data-theme=light] .btn.ghost{color:var(--text)}
       var d = r.data; if (r.error || !d) return;
       if (d.error) { if (d.error === 'session') { clearSession(); render(); } return; }
       var arr = d.messages || [];
+      if (!first) arr = arr.filter(function(m){ return m.id > (state.chatLast || 0); });
       if (first) state.chatMsgs = arr; else if (arr.length) state.chatMsgs = state.chatMsgs.concat(arr);
       state.chatLast = state.chatMsgs.length ? state.chatMsgs[state.chatMsgs.length - 1].id : 0;
       var box = $('chatlist');
-      if (box && (first || arr.length)) {
+      var force = false;
+      if (state.chatPend && (forceScroll || arr.some(function(m){ return m.sender === 'customer'; })) && state.chatPend.some(function(x){ return x.done; })) { state.chatPend = state.chatPend.filter(function(x){ return !x.done; }); force = true; }
+      if (box && (first || arr.length || force)) {
         var near = box.scrollHeight - box.scrollTop - box.clientHeight < 90;
         box.innerHTML = chatListHtml();
         if (first || near || forceScroll) box.scrollTop = box.scrollHeight;
@@ -1085,17 +1097,25 @@ html[data-theme=light] .btn.ghost{color:var(--text)}
     if (state.tab === 'info' && state.help === 'chat') return;
     try { var r = await sb.rpc('chat_unread', { p_token: state.token }); if (!r.error && typeof r.data === 'number' && r.data !== state.chatUnread) { state.chatUnread = r.data; renderNav(); } } catch(e){}
   }
-  async function chatSend(){
+  function chatSend(){
     var inp = $('ch_in'); if (!inp) return;
     var body = inp.value.trim(), img = state.chImg || null; if (!body && !img) return;
-    var btn = $('ch_send'); btn.disabled = true;
-    var r; try { r = await sb.rpc('chat_send', { p_token: state.token, p_body: body, p_img: img }); } catch(e){ r = null; }
-    btn.disabled = false;
-    var d = r && r.data;
-    if (!d || r.error) { toast('Yuborilmadi. Internetni tekshiring'); return; }
-    if (d.error) { if (d.error === 'session') { clearSession(); render(); toast('Seans tugagan. Qayta kiring'); return; } toast(d.error); return; }
     inp.value = ''; inp.style.height = ''; state.chImg = null; var pv = $('chimgprev'); if (pv) pv.innerHTML = '';
-    await chatLoad(false, true);
+    var m = { k: Date.now() + '' + Math.floor(Math.random() * 1000), body: body, img: img, done: false, err: false };
+    (state.chatPend = state.chatPend || []).push(m);
+    chatRedraw(true); inp.focus();
+    chatPush(m);
+  }
+  async function chatPush(m){
+    m.err = false; m.done = false;
+    var r; try { r = await sb.rpc('chat_send', { p_token: state.token, p_body: m.body, p_img: m.img }); } catch(e){ r = null; }
+    var d = r && r.data;
+    if (!d || r.error) { m.err = true; chatRedraw(true); toast('Yuborilmadi. Internetni tekshiring'); return; }
+    if (d.error) {
+      if (d.error === 'session') { clearSession(); render(); toast('Seans tugagan. Qayta kiring'); return; }
+      m.err = true; chatRedraw(true); toast(d.error); return;
+    }
+    m.done = true; chatLoad(false, true);
   }
   async function chatPickImg(file){
     try {
@@ -1250,9 +1270,14 @@ html[data-theme=light] .btn.ghost{color:var(--text)}
   }
   themeApply();
   document.addEventListener('click', function(e){
-    var t = e.target.closest && e.target.closest('#theme,#bell,[data-help],[data-like],[data-star],#rv_save,#rv_del,#ch_send,[data-chzoom],[data-chrm],[data-annzoom]');
+    var t = e.target.closest && e.target.closest('[data-chretry],[data-chdrop],#theme,#bell,[data-help],[data-like],[data-star],#rv_save,#rv_del,#ch_send,[data-chzoom],[data-chrm],[data-annzoom]');
     if (!t) return;
-    if (t.id === 'theme') toggleTheme();
+    if (t.dataset.chretry || t.dataset.chdrop) {
+      e.preventDefault(); var kk = t.dataset.chretry || t.dataset.chdrop, mm = (state.chatPend || []).filter(function(x){ return x.k === kk; })[0];
+      if (mm && t.dataset.chretry) { mm.err = false; chatRedraw(true); chatPush(mm); }
+      else if (mm) { state.chatPend = state.chatPend.filter(function(x){ return x !== mm; }); chatRedraw(false); }
+    }
+    else if (t.id === 'theme') toggleTheme();
     else if (t.id === 'bell') openAnns();
     else if (t.dataset.help) { state.help = t.dataset.help; render(); }
     else if (t.dataset.like) toggleLike(+t.dataset.like);

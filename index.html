@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0e0e10">
+<meta name="theme-color" id="themeMeta" content="#0e0e10">
+<script>try{if(localStorage.getItem("qs_theme")==="light"){document.documentElement.setAttribute("data-theme","light");}}catch(e){}</script>
 <title>qSHOP</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
@@ -178,6 +179,23 @@ label{font-size:12px;color:var(--muted);display:block;margin:0 0 4px 2px}
 .ok{text-align:center;padding:26px 18px 6px}
 .ok b{display:block;font-size:44px;margin-bottom:6px}
 button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+
+/* ---- oq (kunduzgi) mavzu ---- */
+html[data-theme=light]{--bg:#f4f2ec;--card:#ffffff;--card2:#f0ede5;--line:#dedad0;--gold:#b8901a;--gold2:#8a6a0a;--text:#1b1a17;--muted:#6f6b60;--red:#e5383b;--green:#1f9d6a}
+html[data-theme=light] header{background:rgba(255,255,255,.94)}
+html[data-theme=light] nav{background:rgba(255,255,255,.97)}
+html[data-theme=light] .hero{background:linear-gradient(135deg,#fff3cf,#fbf6e6 60%);border-color:#ead9a0}
+html[data-theme=light] .hero p,html[data-theme=light] .step div,html[data-theme=light] [style*="#cfc9b3"],html[data-theme=light] [style*="#d8d4c4"]{color:#4a4638!important}
+html[data-theme=light] .chip.on,html[data-theme=light] .tag{background:#fbefc4;color:#6e5206}
+html[data-theme=light] .likebtn.on{background:#ffe5e6;border-color:#f0a5a8}
+html[data-theme=light] .stars button{color:#c9c5b8}
+html[data-theme=light] .stars button.on{color:#d4a017}
+html[data-theme=light] .dots i{background:#c9c5b8}
+html[data-theme=light] .toast{background:#1b1a17;color:#fff}
+html[data-theme=light] .card{box-shadow:0 1px 3px rgba(0,0,0,.06)}
+html[data-theme=light] .sheet-bg{background:rgba(0,0,0,.35)}
+html[data-theme=light] .seg button.on,html[data-theme=light] .btn,html[data-theme=light] .cb.me{color:#fff}
+html[data-theme=light] .btn.ghost{color:var(--text)}
 </style>
 </head>
 <body>
@@ -186,6 +204,7 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
     <div class="logo">qSH</div>
     <div><h1 id="brand">q<span>SHOP</span></h1><small id="tagline">Xitoy tovarlari, guruh bilan arzon</small></div>
     <button class="bell" id="bell" aria-label="Bildirishnomalar"><span>🔔</span><small>Xabarlar</small><em class="bn" id="bellN"></em></button>
+    <button class="bell" id="theme" aria-label="Fon rangi" style="margin-left:0"><span id="themeI">🌙</span><small id="themeT">Qora</small></button>
   </header>
   <main id="main"><div class="empty"><b>⏳</b>Yuklanmoqda...</div></main>
   <nav id="nav"></nav>
@@ -1217,10 +1236,24 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
     }
   }
 
+  function themeApply(){
+    var l = document.documentElement.getAttribute('data-theme') === 'light';
+    var m = document.getElementById('themeMeta'); if (m) m.setAttribute('content', l ? '#f4f2ec' : '#0e0e10');
+    var i = document.getElementById('themeI'), t = document.getElementById('themeT');
+    if (i) i.textContent = l ? '☀️' : '🌙'; if (t) t.textContent = l ? 'Oq' : 'Qora';
+  }
+  function toggleTheme(){
+    var l = document.documentElement.getAttribute('data-theme') === 'light';
+    if (l) document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', 'light');
+    try { localStorage.setItem('qs_theme', l ? 'dark' : 'light'); } catch(e){}
+    themeApply();
+  }
+  themeApply();
   document.addEventListener('click', function(e){
-    var t = e.target.closest && e.target.closest('#bell,[data-help],[data-like],[data-star],#rv_save,#rv_del,#ch_send,[data-chzoom],[data-chrm],[data-annzoom]');
+    var t = e.target.closest && e.target.closest('#theme,#bell,[data-help],[data-like],[data-star],#rv_save,#rv_del,#ch_send,[data-chzoom],[data-chrm],[data-annzoom]');
     if (!t) return;
-    if (t.id === 'bell') openAnns();
+    if (t.id === 'theme') toggleTheme();
+    else if (t.id === 'bell') openAnns();
     else if (t.dataset.help) { state.help = t.dataset.help; render(); }
     else if (t.dataset.like) toggleLike(+t.dataset.like);
     else if (t.dataset.star) { state.rvStar = +t.dataset.star; Array.prototype.forEach.call(document.querySelectorAll('#rv_stars button'), function(b){ b.classList.toggle('on', +b.dataset.star <= state.rvStar); }); }

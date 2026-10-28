@@ -488,14 +488,18 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
     return h;
   }
 
+  var SHUF = Math.floor(Math.random() * 1e9) + 1;
+  function shufKey(id){ var x = (Math.imul((+id || 0) ^ SHUF, 2654435761) >>> 0); x ^= x >>> 15; x = Math.imul(x, 2246822519) >>> 0; x ^= x >>> 13; return x; }
   function filtered(){
     var q = state.q.trim().toLowerCase();
-    return state.products.filter(function(p){
+    var arr = state.products.filter(function(p){
       if (state.cat === '__fav') { if (!state.liked[p.id]) return false; }
       else if (state.cat && p.category !== state.cat) return false;
       if (!q) return true;
       return (p.name + ' ' + p.desc + ' ' + p.category).toLowerCase().indexOf(q) >= 0;
     });
+    if (!q && !window.__NOSHUF) arr.sort(function(a, b){ return shufKey(a.id) - shufKey(b.id); });   // har safar ilova ochilganda aralash, ochiq turganda bir xil
+    return arr;
   }
   function toolbarHtml(){
     var h = '<input id="s_q" type="search" placeholder="' + esc(state.shop.search_ph || '🔍 Mahsulot qidirish...') + '" value="' + esc(state.q) + '" autocomplete="off" style="margin-bottom:10px">';

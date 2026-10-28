@@ -4,7 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<meta name="theme-color" content="#0e0e10">
+<meta name="theme-color" id="themeMeta" content="#0e0e10">
+<script>try{if(localStorage.getItem("qa_theme")==="light"){document.documentElement.setAttribute("data-theme","light");}}catch(e){}</script>
 <title>qSHOP Admin</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
@@ -85,6 +86,26 @@ a{color:var(--gold2)}
 .rcbig{position:fixed;inset:0;background:rgba(0,0,0,.94);z-index:80;display:grid;place-items:center;padding:10px;overflow:auto}.rcbig img{max-width:100%;max-height:100%;object-fit:contain}
 .kv{font-size:14px;margin-bottom:3px}.kv span{color:var(--muted)}
 button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+
+/* ---- oq mavzu ---- */
+html[data-theme=light]{--bg:#f4f2ec;--card:#ffffff;--card2:#f0ede5;--line:#dedad0;--gold:#b8901a;--gold2:#8a6a0a;--text:#1b1a17;--muted:#6f6b60;--red:#e5383b;--green:#1f9d6a}
+html[data-theme=light] header{background:rgba(255,255,255,.95)}
+html[data-theme=light] nav{background:rgba(255,255,255,.98)}
+html[data-theme=light] .chip.on{background:#fbefc4;color:#6e5206}
+html[data-theme=light] .btn.danger{border-color:#f0a5a8;color:var(--red)}
+html[data-theme=light] .toast{background:#1b1a17;color:#fff}
+html[data-theme=light] .card{box-shadow:0 1px 3px rgba(0,0,0,.06)}
+html[data-theme=light] .btn{color:#fff}
+html[data-theme=light] .btn.ghost{color:var(--text)}
+html[data-theme=light] .logo{color:#fff}
+html[data-theme=light] .pill[style*="f3d77a"],html[data-theme=light] [style*="color:#f3d77a"]{color:#8a6a0a!important}
+html[data-theme=light] .pill[style*="6aa9ff"]{color:#1f6fd1!important}
+html[data-theme=light] .pill[style*="b48cff"]{color:#7a4fd6!important}
+html[data-theme=light] .pill[style*="3ecf8e"],html[data-theme=light] [style*="color:#6fcf97"]{color:#1f9d6a!important}
+html[data-theme=light] [style*="background:#2a2208"]{background:#fbefc4!important}
+html[data-theme=light] [style*="color:var(--gold2)"]{color:#8a6a0a}
+html[data-theme=light] #chlog [style*="var(--card2)"]{background:#eeebe2!important}
+html[data-theme=light] .ohead .ch,html[data-theme=light] .oth{border-color:var(--line)}
 </style>
 </head>
 <body>
@@ -173,9 +194,21 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
   }
 
   /* ---------- Qobiq ---------- */
+  function themeApply(){
+    var l = document.documentElement.getAttribute('data-theme') === 'light';
+    var m = document.getElementById('themeMeta'); if (m) m.setAttribute('content', l ? '#f4f2ec' : '#0e0e10');
+    var i = document.getElementById('themeI'); if (i) i.textContent = l ? '☀️' : '🌙';
+  }
+  function toggleTheme(){
+    var l = document.documentElement.getAttribute('data-theme') === 'light';
+    if (l) document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', 'light');
+    try { localStorage.setItem('qa_theme', l ? 'dark' : 'light'); } catch(e){}
+    themeApply();
+  }
   function drawShell(){
-    $('app').innerHTML = '<header><div class="logo">qSH</div><h1>qSHOP Admin<small id="sub"></small></h1><button id="refresh">⟳</button><button id="logout">Chiqish</button></header>' +
+    $('app').innerHTML = '<header><div class="logo">qSH</div><h1>qSHOP Admin<small id="sub"></small></h1><button id="theme" aria-label="Fon rangi"><span id="themeI">🌙</span></button><button id="refresh">⟳</button><button id="logout">Chiqish</button></header>' +
       '<main id="view"></main><nav id="nav"></nav>';
+    themeApply();
   }
   function renderNav(){
     if (!$('nav')) return;
@@ -909,7 +942,7 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
     return '';
   }
   function viewTexts(){
-    var ver = '<div class="muted" style="text-align:center;margin:22px 0 8px;font-size:12px">Admin ilova versiyasi: 2026.10.28-m (tez chat)</div>';
+    var ver = '<div class="muted" style="text-align:center;margin:22px 0 8px;font-size:12px">Admin ilova versiyasi: 2026.10.28-n (oq/qora fon)</div>';
     if (!S.sub) {
       return '<h2 style="margin-top:4px">Sozlamalar</h2>' + SUBS.map(function(x){
         return '<div class="card mn" data-sub="' + x[0] + '"><span class="ic">' + x[1] + '</span><div class="t"><b>' + x[2] + '</b><span class="muted">' + subStatus(x[0]) + '</span></div><span class="go">›</span></div>';
@@ -1093,10 +1126,11 @@ button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-colo
 
   /* ---------- Hodisalar ---------- */
   document.addEventListener('click', async function(e){
-    var t = e.target.closest('[data-oimg],[data-otog],[data-chopen],[data-chback],[data-chattach],[data-chmedel],#ch_send,[data-nfattach],[data-nfmedel],#nf_send,[data-nfdel],[data-rvsave],[data-rvhide],[data-rvdel],[data-sub],[id^=sv_],[data-cpdel],#cf_add,[data-adcopy],[data-adadd],[data-addel],[data-admv],#ad_save,[data-tab],[data-cust],[data-more],[data-gocust],[data-custedit],#ce_save,[data-rcp],[data-resetpin],[data-block],[data-filter],[data-edit],[data-closemodal],[data-pickimg],[data-pickgal],[data-rmgal],[data-rmimg],[data-delprod],[data-delorder],#l_go,#pf_save,[data-pickgal],[data-rmgal],#cc_use,#cc_save,#tx_save,#logout,#refresh');
+    var t = e.target.closest('#theme,[data-oimg],[data-otog],[data-chopen],[data-chback],[data-chattach],[data-chmedel],#ch_send,[data-nfattach],[data-nfmedel],#nf_send,[data-nfdel],[data-rvsave],[data-rvhide],[data-rvdel],[data-sub],[id^=sv_],[data-cpdel],#cf_add,[data-adcopy],[data-adadd],[data-addel],[data-admv],#ad_save,[data-tab],[data-cust],[data-more],[data-gocust],[data-custedit],#ce_save,[data-rcp],[data-resetpin],[data-block],[data-filter],[data-edit],[data-closemodal],[data-pickimg],[data-pickgal],[data-rmgal],[data-rmimg],[data-delprod],[data-delorder],#l_go,#pf_save,[data-pickgal],[data-rmgal],#cc_use,#cc_save,#tx_save,#logout,#refresh');
     if (!t) return;
     if (t.id === 'l_go') return doLogin();
     if (t.id === 'logout') return logout();
+    if (t.id === 'theme') { toggleTheme(); return; }
     if (t.id === 'refresh') { await refreshAll(); render(); toast('Yangilandi'); return; }
     if (t.dataset.rcp) return showReceipt(+t.dataset.rcp);
     if (t.dataset.gocust) { S.tab = 'customers'; S.cq = String(1000 + +t.dataset.gocust); S.copen = 'c' + t.dataset.gocust; await loadAccounts(); render(); window.scrollTo(0, 0); return; }

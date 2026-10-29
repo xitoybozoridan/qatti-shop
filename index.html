@@ -227,6 +227,7 @@ html[data-theme=light] .btn.ghost{color:var(--text)}
 .addrrow:first-child{border-top:0}
 .addrrow .t{flex:1;min-width:0;font-size:14px;line-height:1.4}
 .addrrow button{background:none;border:1px solid var(--line);color:var(--muted);border-radius:8px;padding:4px 8px;font-size:12px;font-family:inherit}
+.cpn .btn{width:auto;flex:none}
 </style>
 </head>
 <body>
@@ -835,7 +836,7 @@ html[data-theme=light] .btn.ghost{color:var(--text)}
       var need = lv.need, pct = need == null ? 100 : Math.max(4, Math.min(100, Math.round((lv.spend - lv.min) / Math.max(1, (lv.next_min - lv.min)) * 100)));
       h += '<div class="pbar"><i style="width:' + pct + '%"></i></div><div class="muted" style="font-size:12px">' +
         (need == null ? '🏆 Siz eng yuqori darajadasiz!' : esc(lv.next_emoji) + ' ' + esc(lv.next_name) + ' darajasigacha yana <b>' + money(need) + '</b> xarid qoldi') +
-        (+lv.extra > 0 ? ' · keshbek +' + (+lv.extra) + '%' : '') + '</div>';
+        (+lv.extra > 0 ? ' · har buyurtmaga +' + money(+lv.extra) + ' ball' : '') + '</div>';
     }
     h += '</div>';
     h += '<div class="row" style="gap:8px;margin-bottom:6px"><div class="card" style="flex:1;padding:10px;text-align:center;cursor:default"><b style="font-size:18px">' + state.orders.filter(function(o){ return o.server; }).length + '</b><div class="muted" style="font-size:11px">Buyurtma</div></div>' +
@@ -846,7 +847,7 @@ html[data-theme=light] .btn.ghost{color:var(--text)}
     if (L && L.on) {
       var hist = (L.history || []).map(function(x){ return '<div class="hrow"><span>' + esc(x.note || '') + '<br><span class="muted" style="font-size:11px">' + new Date(x.created_at).toLocaleDateString('ru') + '</span></span><b style="color:' + (+x.amount >= 0 ? '#6fcf97' : 'var(--red)') + '">' + (+x.amount >= 0 ? '+' : '') + Math.floor(+x.amount).toLocaleString('ru') + '</b></div>'; }).join('');
       h += accHtml('bonus', '🎁', 'Bonus ballar', Math.floor(+L.balance || 0).toLocaleString('ru') + ' ball',
-        '<div class="hint" style="margin:0 0 10px">Har bir yetib kelgan xariddan <b>' + (+L.cashback + (lv ? +lv.extra : 0)) + '%</b> ball qaytadi. 1 ball = 1 so\'m. Ballni savatda buyurtmaning ' + (+L.max_use) + '% igacha ishlatasiz.</div>' +
+        '<div class="hint" style="margin:0 0 10px">Har bir yetib kelgan buyurtmadan <b>' + Math.floor(+L.cb_sum + (lv ? +lv.extra : 0)).toLocaleString('ru') + ' ball</b> qaytadi' + (+L.cb_min > 0 ? ' (buyurtma ' + money(+L.cb_min) + ' dan kam bo\'lmasa)' : '') + '. 1 ball = 1 so\'m. Ballni savatda buyurtmaning ' + (+L.max_use) + '% igacha ishlatasiz.</div>' +
         (hist || '<div class="muted">Hozircha ball yo\'q. Birinchi xariddan keyin shu yerda ko\'rinadi.</div>'));
     }
     var cps = (L && L.coupons) || [];
@@ -857,7 +858,7 @@ html[data-theme=light] .btn.ghost{color:var(--text)}
       var link = refLink(), shareTxt = 'qatti.SHOP — Xitoy tovarlari arzon narxda! Mening havolam orqali kiring: ';
       h += accHtml('ref', '👥', 'Do\'stni taklif qilish', L.ref_count ? L.ref_count + ' ta' : '',
         '<div class="hint" style="margin:0 0 10px">Do\'stingiz havolangiz orqali ro\'yxatdan o\'tib, birinchi xaridini olsa, ikkalangizga <b>' + Math.floor(+L.ref_bonus || 0).toLocaleString('ru') + ' ball</b> beriladi.</div>' +
-        '<div class="cpn"><div style="flex:1;min-width:0;word-break:break-all;font-size:13px">' + esc(link) + '</div><button class="btn small ghost" data-copy="' + esc(link) + '">Nusxalash</button></div>' +
+        '<div class="cpn"><div style="flex:1;min-width:0"><div class="muted" style="font-size:11px">Sizning kodingiz</div><b style="font-size:18px;letter-spacing:1px">' + esc(m.ref_code) + '</b></div><button class="btn small ghost" style="width:auto;flex:none" data-copy="' + esc(link) + '">🔗 Havolani nusxalash</button></div>' +
         '<div class="row" style="gap:8px"><a class="btn small" style="flex:1;text-align:center" target="_blank" rel="noopener" href="https://t.me/share/url?url=' + encodeURIComponent(link) + '&text=' + encodeURIComponent(shareTxt) + '">✈️ Telegramda ulashish</a>' +
         '<button class="btn small ghost" data-pf="share" style="flex:1">📤 Ulashish</button></div>' +
         '<div class="muted" style="margin-top:10px;font-size:12px">Ro\'yxatdan o\'tgan do\'stlar: <b>' + (+L.ref_count || 0) + '</b> · Xarid qilganlari: <b>' + (+L.ref_done || 0) + '</b></div>');

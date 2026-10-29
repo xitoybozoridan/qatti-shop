@@ -720,13 +720,13 @@ html[data-theme=light] .btn.ghost{color:var(--text)}
       if (r.error) return;
       if (r.data && r.data.error) { clearSession(); if (state.tab === 'profile' || state.tab === 'cart') render(); return; }
       if (r.data && r.data.profile) { state.me = r.data.profile; save('qs_me', state.me); }
-      loadMyOrders(); loadLoy();
+      loadMyOrders(); loadLoy(); pushSync();
     } catch(e){}
   }
   async function afterAuth(d){
     setSession(d); toast('Xush kelibsiz, ' + d.profile.name + '!');
     var next = state.next; state.next = '';
-    state.loy = null; state.tab = (next && state.cart.length) ? next : 'profile'; render(); loadMyOrders(); loadLoy();
+    state.loy = null; state.tab = (next && state.cart.length) ? next : 'profile'; render(); loadMyOrders(); loadLoy(); pushSync();
   }
   async function busy(id, label, fn){
     var b = $(id); if (!b) return; var t = b.textContent; b.disabled = true; b.textContent = label;
@@ -779,7 +779,8 @@ html[data-theme=light] .btn.ghost{color:var(--text)}
   }
   async function doLogout(){
     if (!confirm('Hisobdan chiqasizmi?')) return;
-    var tk = state.token; clearSession(); state.pmode = 'login'; render();
+    var tk = state.token; save('qs_push', 0); clearSession(); state.pmode = 'login'; render();
+    if (pushOk()) navigator.serviceWorker.ready.then(function(rg){ return rg.pushManager.getSubscription(); }).then(function(sb2){ if (sb2) sb.rpc('push_unsub', { p_token: tk, p_endpoint: sb2.endpoint }); }).catch(function(){});
     try { await sb.rpc('c_logout', { p_token: tk }); } catch(e){}
   }
   function renderProfile(){
@@ -844,6 +845,7 @@ html[data-theme=light] .btn.ghost{color:var(--text)}
       '<div class="card" style="flex:1;padding:10px;text-align:center;cursor:default"><b style="font-size:14px;color:var(--gold2)">' + money(spent) + '</b><div class="muted" style="font-size:11px">Jami xarid</div></div></div>';
     h += '<div class="qgrid"><button data-tab="orders"><span>📦</span>Buyurtmalarim</button><button data-pf="fav"><span>❤️</span>Sevimlilar</button>' +
       '<button data-pf="acc:coupons"><span>🎟</span>Kuponlarim' + (L && L.coupons && L.coupons.length ? ' (' + L.coupons.length + ')' : '') + '</button><button data-tab="info"><span>💬</span>Yordam</button></div>';
+    h += pushCard();
     if (L && L.on) {
       var hist = (L.history || []).map(function(x){ return '<div class="hrow"><span>' + esc(x.note || '') + '<br><span class="muted" style="font-size:11px">' + new Date(x.created_at).toLocaleDateString('ru') + '</span></span><b style="color:' + (+x.amount >= 0 ? '#6fcf97' : 'var(--red)') + '">' + (+x.amount >= 0 ? '+' : '') + Math.floor(+x.amount).toLocaleString('ru') + '</b></div>'; }).join('');
       h += accHtml('bonus', '🎁', 'Bonus ballar', Math.floor(+L.balance || 0).toLocaleString('ru') + ' ball',
@@ -901,6 +903,7 @@ html[data-theme=light] .btn.ghost{color:var(--text)}
     state.me = d.profile; save('qs_me', state.me); return true;
   }
   async function pfAction(a, t){
+    if (a === 'pushon') { pushEnable(); return; } if (a === 'pushoff') { pushOff(); return; }
     var k = a.split(':')[0], v = a.slice(k.length + 1), y = window.scrollY;
     if (k === 'acc') { state.acc = state.acc === v ? '' : v; render(); var el = $('acc_' + v); if (el && state.acc) el.scrollIntoView({ block: 'start' }); else window.scrollTo(0, y); }
     else if (k === 'avtoggle') { state.pickAv = !state.pickAv; render(); }
@@ -1443,6 +1446,53 @@ html[data-theme=light] .btn.ghost{color:var(--text)}
     var t = e.target; if (t && t.id === 'ch_in') { t.style.height = 'auto'; t.style.height = Math.min(110, t.scrollHeight) + 'px'; }
   });
 
+  // ---- Xabarnomalar (push) ----
+  var VAPID = 'BOZKMhF4ll9uEKEDNWrzMSblrvxzn5MY7WuDvVlWnODj_wTsNmR1uV5n__IMX2Bpg1xEiAxLcDMsRg9TtBDtQso';
+  function pushOk(){ return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window && location.protocol !== 'file:'; }
+  function b64u(s){ var p = '='.repeat((4 - s.length % 4) % 4), b = (s + p).replace(/-/g, '+').replace(/_/g, '/'), r = atob(b), o = new Uint8Array(r.length); for (var i = 0; i < r.length; i++) o[i] = r.charCodeAt(i); return o; }
+  function bufB64(buf){ var a = new Uint8Array(buf), s2 = ''; for (var i = 0; i < a.length; i++) s2 += String.fromCharCode(a[i]); return btoa(s2); }
+  async function pushSubscribe(){
+    var reg = await navigator.serviceWorker.ready;
+    var sub = await reg.pushManager.getSubscription();
+    if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64u(VAPID) });
+    var j = sub.toJSON(), k = j.keys || {};
+    var r = await sb.rpc('push_sub', { p_token: state.token, p_endpoint: sub.endpoint, p_p256dh: k.p256dh, p_auth: k.auth });
+    if (r.error || (r.data && r.data.error)) throw new Error('server');
+    save('qs_push', 1);
+    return sub;
+  }
+  async function pushSync(){
+    try { if (pushOk() && state.token && Notification.permission === 'granted') await pushSubscribe(); } catch(e){}
+  }
+  async function pushEnable(){
+    if (!pushOk()) { toast('Bu qurilmada xabarnoma qo\'llab-quvvatlanmaydi'); return; }
+    if (!state.token) { toast('Avval hisobga kiring'); return; }
+    try {
+      var p = await Notification.requestPermission();
+      if (p !== 'granted') { toast('Ruxsat berilmadi'); render(); return; }
+      await pushSubscribe(); toast('Xabarnomalar yoqildi 🔔');
+    } catch(e){ toast('Yoqib bo\'lmadi. Keyinroq urinib ko\'ring'); }
+    render();
+  }
+  async function pushOff(){
+    try { var reg = await navigator.serviceWorker.ready, sub = await reg.pushManager.getSubscription();
+      if (sub) { try { await sb.rpc('push_unsub', { p_token: state.token, p_endpoint: sub.endpoint }); } catch(e){} await sub.unsubscribe(); } } catch(e){}
+    save('qs_push', 0); toast('Xabarnomalar o\'chirildi'); render();
+  }
+  function pushCard(){
+    if (!pushOk()) return '';
+    var perm = Notification.permission;
+    if (perm === 'granted' && load('qs_push', 0)) return '<div class="card" style="cursor:default;display:flex;align-items:center;gap:10px;padding:10px 14px"><span style="font-size:20px">🔔</span><div style="flex:1;font-size:13px">Xabarnomalar yoqilgan</div><button class="btn small ghost" style="width:auto" data-pf="pushoff">O\'chirish</button></div>';
+    if (perm === 'denied') return '<div class="hint">🔕 Xabarnomalar bloklangan. Yoqish uchun telefon sozlamalaridan ilova xabarnomalariga ruxsat bering.</div>';
+    return '<div class="card" style="cursor:default;padding:12px 14px"><div style="font-weight:700;margin-bottom:4px">🔔 Xabarnomalarni yoqing</div><div class="muted" style="font-size:12.5px;margin-bottom:8px">Buyurtma holati va admin javobi telefoningizning tepasida chiqadi.</div><button class="btn small" data-pf="pushon">Yoqish</button></div>';
+  }
+  function goTo(go){
+    if (go === 'orders') { state.tab = 'orders'; render(); refreshStatuses(); }
+    else if (go === 'chat') { state.tab = 'info'; state.help = 'chat'; render(); }
+    else if (go === 'profile') { state.tab = 'profile'; render(); loadLoy(); }
+  }
+  if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', function(e){ if (e.data && e.data.go) goTo(e.data.go); });
+
   async function init(){
     state.cart = load('qs_cart', []); state.orders = load('qs_orders', []); state.statuses = load('qs_status', {}); state.ship = load('qs_ship', {});
     state.token = load('qs_token', ''); state.me = state.token ? load('qs_me', null) : null; state.loy = state.token ? load('qs_loy', null) : null;
@@ -1451,6 +1501,7 @@ html[data-theme=light] .btn.ghost{color:var(--text)}
     if (!ok) { $('main').innerHTML = '<div class="empty"><b>📡</b>Mahsulotlar yuklanmadi.<br>Internetni tekshirib, qayta urinib ko\'ring.</div>'; renderNav(); }
     else {
       render();
+      try { var go = new URLSearchParams(location.search).get('go'); if (go) { goTo(go); try { history.replaceState(null, '', location.pathname); } catch(e3){} } } catch(e){}
       checkSession();
       refreshStatuses();
       state.anns = load('qs_anns', []); bellUpdate(); loadAnns(); loadStats(); chatUnreadPoll();

@@ -29,3 +29,22 @@ self.addEventListener('fetch', e => {
     }).catch(() => caches.match(req).then(hit => hit || caches.match('./index.html')))
   );
 });
+
+// ---- Xabarnomalar (push) ----
+self.addEventListener('push', e => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch (_) { d = { body: e.data ? e.data.text() : '' }; }
+  e.waitUntil(self.registration.showNotification(d.title || 'qatti.SHOP', {
+    body: d.body || '', icon: 'icon-192.png', badge: 'icon-192.png', data: { url: d.url || './' }
+  }));
+});
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  const url = (e.notification.data && e.notification.data.url) || './';
+  const go = (new URL(url, self.registration.scope)).searchParams.get('go');
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+    const w = list.find(c => c.url.startsWith(self.registration.scope));
+    if (w) { if (go) w.postMessage({ go }); return w.focus(); }
+    return self.clients.openWindow(new URL(url, self.registration.scope).href);
+  }));
+});

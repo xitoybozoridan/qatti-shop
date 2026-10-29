@@ -157,11 +157,45 @@ html[data-theme=light] .ohead .ch,html[data-theme=light] .oth{border-color:var(-
   async function isAdmin(){
     try { var r = await sb.from('admins').select('user_id').maybeSingle(); return !r.error && !!r.data; } catch(e){ return false; }
   }
+  /* ---------- Xabarnomalar (push) ---------- */
+  var VAPID = 'BOZKMhF4ll9uEKEDNWrzMSblrvxzn5MY7WuDvVlWnODj_wTsNmR1uV5n__IMX2Bpg1xEiAxLcDMsRg9TtBDtQso';
+  function pushOk(){ return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window && location.protocol !== 'file:'; }
+  function b64u(x){ var p = '='.repeat((4 - x.length % 4) % 4), b = (x + p).replace(/-/g, '+').replace(/_/g, '/'), r = atob(b), o = new Uint8Array(r.length); for (var i = 0; i < r.length; i++) o[i] = r.charCodeAt(i); return o; }
+  async function pushSubscribe(){
+    var reg = await navigator.serviceWorker.ready, sub = await reg.pushManager.getSubscription();
+    if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64u(VAPID) });
+    var k = sub.toJSON().keys || {};
+    var r = await sb.rpc('admin_push_sub', { p_endpoint: sub.endpoint, p_p256dh: k.p256dh, p_auth: k.auth });
+    if (r.error) throw r.error;
+    try { localStorage.setItem('qa_push', '1'); } catch(e){}
+  }
+  async function pushSync(){ try { if (pushOk() && Notification.permission === 'granted') await pushSubscribe(); } catch(e){} }
+  async function pushToggle(){
+    var on = false; try { on = localStorage.getItem('qa_push') === '1'; } catch(e){}
+    if (on) {
+      try { var reg = await navigator.serviceWorker.ready, sub = await reg.pushManager.getSubscription();
+        if (sub) { await sb.rpc('admin_push_unsub', { p_endpoint: sub.endpoint }); await sub.unsubscribe(); } } catch(e){}
+      try { localStorage.setItem('qa_push', '0'); } catch(e){} toast('Xabarnoma o\'chirildi'); render(); return;
+    }
+    if (!pushOk()) { toast('Bu qurilmada xabarnoma ishlamaydi'); return; }
+    try {
+      var p = await Notification.requestPermission();
+      if (p !== 'granted') { toast('Ruxsat berilmadi'); return; }
+      await pushSubscribe(); toast('Xabarnoma yoqildi 🔔');
+    } catch(e){ toast('Yoqib bo\'lmadi: ' + (e.message || '')); }
+    render();
+  }
+  function pushCard(){
+    if (!pushOk()) return '';
+    var on = false; try { on = localStorage.getItem('qa_push') === '1' && Notification.permission === 'granted'; } catch(e){}
+    return '<div class="card" style="cursor:default;display:flex;align-items:center;gap:10px"><span style="font-size:22px">🔔</span><div style="flex:1"><b>Xabarnoma</b><div class="muted" style="font-size:12px">' + (on ? 'Yoqilgan: yangi buyurtma va chat xabari telefoningizda chiqadi' : 'Yangi buyurtma va chat xabari telefoningizning tepasida chiqsin') + '</div></div><button class="btn small ' + (on ? 'ghost' : '') + '" style="width:auto" data-admpush="1">' + (on ? 'O\'chirish' : 'Yoqish') + '</button></div>';
+  }
+
   async function enter(){
     if (!(await isAdmin())) { await sb.auth.signOut(); showLogin('Bu hisob admin sifatida qo\'shilmagan'); return; }
     $('app').innerHTML = '<div class="empty"><b>⏳</b>Yuklanmoqda...</div>';
     await refreshAll();
-    drawShell(); render();
+    drawShell(); render(); pushSync();
   }
   async function logout(){ await sb.auth.signOut(); showLogin(''); }
 
@@ -988,9 +1022,9 @@ html[data-theme=light] .ohead .ch,html[data-theme=light] .oth{border-color:var(-
     return '';
   }
   function viewTexts(){
-    var ver = '<div class="muted" style="text-align:center;margin:22px 0 8px;font-size:12px">Admin ilova versiyasi: 2026.10.29-r (somda bonus)</div>';
+    var ver = '<div class="muted" style="text-align:center;margin:22px 0 8px;font-size:12px">Admin ilova versiyasi: 2026.10.29-s (xabarnoma)</div>';
     if (!S.sub) {
-      return '<h2 style="margin-top:4px">Sozlamalar</h2>' + SUBS.map(function(x){
+      return '<h2 style="margin-top:4px">Sozlamalar</h2>' + pushCard() + SUBS.map(function(x){
         return '<div class="card mn" data-sub="' + x[0] + '"><span class="ic">' + x[1] + '</span><div class="t"><b>' + x[2] + '</b><span class="muted">' + subStatus(x[0]) + '</span></div><span class="go">›</span></div>';
       }).join('') + ver;
     }
@@ -1207,7 +1241,7 @@ html[data-theme=light] .ohead .ch,html[data-theme=light] .oth{border-color:var(-
 
   /* ---------- Hodisalar ---------- */
   document.addEventListener('click', async function(e){
-    var t = e.target.closest('[data-bonusadj],#theme,[data-oimg],[data-otog],[data-chopen],[data-chback],[data-chattach],[data-chmedel],#ch_send,[data-nfattach],[data-nfmedel],#nf_send,[data-nfdel],[data-rvsave],[data-rvhide],[data-rvdel],[data-sub],[id^=sv_],[data-cpdel],#cf_add,[data-adcopy],[data-adadd],[data-addel],[data-admv],#ad_save,[data-tab],[data-cust],[data-more],[data-gocust],[data-custedit],#ce_save,[data-rcp],[data-resetpin],[data-block],[data-filter],[data-edit],[data-closemodal],[data-pickimg],[data-pickgal],[data-rmgal],[data-rmimg],[data-delprod],[data-delorder],#l_go,#pf_save,[data-pickgal],[data-rmgal],#cc_use,#cc_save,#tx_save,#logout,#refresh');
+    var t = e.target.closest('[data-admpush],[data-bonusadj],#theme,[data-oimg],[data-otog],[data-chopen],[data-chback],[data-chattach],[data-chmedel],#ch_send,[data-nfattach],[data-nfmedel],#nf_send,[data-nfdel],[data-rvsave],[data-rvhide],[data-rvdel],[data-sub],[id^=sv_],[data-cpdel],#cf_add,[data-adcopy],[data-adadd],[data-addel],[data-admv],#ad_save,[data-tab],[data-cust],[data-more],[data-gocust],[data-custedit],#ce_save,[data-rcp],[data-resetpin],[data-block],[data-filter],[data-edit],[data-closemodal],[data-pickimg],[data-pickgal],[data-rmgal],[data-rmimg],[data-delprod],[data-delorder],#l_go,#pf_save,[data-pickgal],[data-rmgal],#cc_use,#cc_save,#tx_save,#logout,#refresh');
     if (!t) return;
     if (t.id === 'l_go') return doLogin();
     if (t.id === 'logout') return logout();
@@ -1245,6 +1279,7 @@ html[data-theme=light] .ohead .ch,html[data-theme=light] .oth{border-color:var(-
     if (t.dataset.nfattach) { $('nf_file').click(); return; }
     if (t.dataset.nfmedel) { S.nfMedia = null; notifyRender(); return; }
     if (t.id === 'nf_send') return nfSend();
+    if (t.dataset.admpush) { pushToggle(); return; }
     if (t.dataset.nfdel) { if (!confirm('Xabar o\'chirilsinmi? Mijozlardan ham yo\'qoladi.')) return; var dr = await sb.from('announcements').delete().eq('id', +t.dataset.nfdel); if (dr.error) { toast('Xatolik: ' + errMsg(dr.error)); return; } await loadAnns(); notifyRender(); return; }
     if (t.dataset.rvsave || t.dataset.rvhide || t.dataset.rvdel) return rvAction(t);
     if (t.dataset.sub !== undefined) { S.sub = t.dataset.sub; S.chatOpen = null; if (S.sub === 'chat') { loadChatThreads().then(function(){ chatRender(); renderNav(); }); } if (S.sub === 'notify') loadAnns().then(notifyRender); if (S.sub === 'reviews') loadRevs().then(rvRender); render(); window.scrollTo(0, 0); return; }

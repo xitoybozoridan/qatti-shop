@@ -178,7 +178,7 @@ html[data-theme=light] .ohead .ch,html[data-theme=light] .oth{border-color:var(-
     var r = await sb.from('settings').select('key,value');
     if (r.error) throw r.error;
     loadAdStats(); loadChatThreads().then(renderNav); loadAnns(); loadRevs(); loadCoupons().then(function(){ cpRender(); if (S.tab === 'texts' && !S.sub && $('view')) render(); });
-    (r.data || []).forEach(function(x){ if (x.key === 'shop') S.shop = x.value || {}; if (x.key === 'info') S.info = x.value || {}; if (x.key === 'calc' && x.value) S.calc = { rate: +x.value.rate || 1750, markup: x.value.markup === undefined ? 30 : +x.value.markup }; if (x.key === 'pay') S.pay = x.value || {}; if (x.key === 'ads') S.ads = normAds(x.value); if (x.key === 'categories') S.cats = (x.value && x.value.list) || []; });
+    (r.data || []).forEach(function(x){ if (x.key === 'loyalty') S.loyalty = x.value || {}; if (x.key === 'shop') S.shop = x.value || {}; if (x.key === 'info') S.info = x.value || {}; if (x.key === 'calc' && x.value) S.calc = { rate: +x.value.rate || 1750, markup: x.value.markup === undefined ? 30 : +x.value.markup }; if (x.key === 'pay') S.pay = x.value || {}; if (x.key === 'ads') S.ads = normAds(x.value); if (x.key === 'categories') S.cats = (x.value && x.value.list) || []; });
   }
   function sig(){ return S.orders.length + ':' + S.orders.map(function(o){ return o.id + o.status + (o.paid ? 1 : 0) + (+o.shipping || 0) + (o.receipt_thumb ? 1 : 0); }).join(',').length + ':' + (S.orders[0] ? S.orders[0].id : 0); }
   async function refreshTab(tab){
@@ -261,8 +261,9 @@ html[data-theme=light] .ohead .ch,html[data-theme=light] .oth{border-color:var(-
         }).join('') +
         (o.receipt_thumb ? '<div class="ord item"><div class="muted" style="margin-bottom:6px">To\'lov cheki (kattalashtirish uchun bosing):</div><img class="rcp" loading="lazy" decoding="async" data-rcp="' + o.id + '" src="' + esc(o.receipt_thumb) + '" alt="chek"></div>' : (S.pay && S.pay.card ? '<div class="ord item"><span class="muted">To\'lov cheki: </span><b style="color:#ff4d4f">yuklanmagan</b></div>' : '')) +
         '<label style="margin:8px 0;font-size:14px;color:var(--text)"><input type="checkbox" data-paid="' + o.id + '"' + (o.paid ? ' checked' : '') + '> ✅ To\'lov qabul qilindi</label>' +
-        '<div class="row sp"><span class="muted">Tovarlar</span><b>' + money((+o.total || 0) + (+o.discount || 0)) + '</b></div>' +
+        '<div class="row sp"><span class="muted">Tovarlar</span><b>' + money((+o.total || 0) + (+o.discount || 0) + (+o.bonus_used || 0)) + '</b></div>' +
         (+o.discount > 0 ? '<div class="row sp"><span class="muted">🎟 Kupon ' + esc(o.coupon) + '</span><b style="color:#6fcf97">−' + money(o.discount) + '</b></div>' : '') +
+        (+o.bonus_used > 0 ? '<div class="row sp"><span class="muted">🎁 Ball ishlatildi</span><b style="color:#6fcf97">−' + money(o.bonus_used) + '</b></div>' : '') +
         '<label>📮 Trek raqami (mijoz ko\'radi)</label><input data-track="' + o.id + '" value="' + esc(o.track || '') + '" placeholder="Masalan: YT1234567890123" autocapitalize="characters">' +
         '<label>Yuk (kargo) narxi, so\'m — mijoz ko\'radi</label><input type="number" inputmode="numeric" data-ship="' + o.id + '" value="' + esc(+o.shipping || '') + '" placeholder="Masalan: 25000">' +
         '<div class="row sp" style="margin-bottom:10px"><span class="muted">To\'lov jami</span><b style="color:var(--gold2)">' + money((+o.total || 0) + (+o.shipping || 0)) + '</b></div>' +
@@ -533,7 +534,7 @@ html[data-theme=light] .ohead .ch,html[data-theme=light] .oth{border-color:var(-
     h += (S.coupons || []).map(function(c){
       var exp = c.expires_at && new Date(c.expires_at) < new Date(), full = +c.max_uses > 0 && c.used >= c.max_uses;
       return '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b style="font-size:16px;letter-spacing:.5px">' + esc(c.code) + '</b>' +
-        '<span class="muted">' + (exp ? '⏰ muddati tugagan' : full ? '⛔ limit tugagan' : '') + '</span></div>' +
+        '<span class="muted">' + (exp ? '⏰ muddati tugagan' : full ? '⛔ limit tugagan' : '') + (c.shown ? ' 👁 profilda' : '') + '</span></div>' +
         '<div class="muted" style="margin:4px 0 8px">' + esc(cpDesc(c)) + '</div>' +
         '<label style="font-size:13px;color:var(--text)"><input type="checkbox" data-cptog="' + c.id + '"' + (c.active ? ' checked' : '') + '> Yoqilgan</label>' +
         '<div style="margin-top:6px"><button class="btn small danger" data-cpdel="' + c.id + '">O\'chirish</button></div></div>';
@@ -547,6 +548,7 @@ html[data-theme=light] .ohead .ch,html[data-theme=light] .oth{border-color:var(-
       '<label>Jami necha marta ishlatilsin (bo\'sh = cheksiz)</label><input id="cf_uses" type="number" inputmode="numeric" placeholder="100">' +
       '<label>Amal qilish muddati (bo\'sh = cheksiz)</label><input id="cf_exp" type="date">' +
       '<label style="margin:8px 0;font-size:14px;color:var(--text)"><input type="checkbox" id="cf_once" checked> Har mijoz faqat 1 marta ishlata olsin</label>' +
+      '<label style="margin:8px 0;font-size:14px;color:var(--text)"><input type="checkbox" id="cf_shown"> Mijoz profilidagi «Kuponlarim» da ko\'rinsin</label>' +
       '<button class="btn" id="cf_add">Kuponni qo\'shish</button></div>';
     return h;
   }
@@ -559,6 +561,7 @@ html[data-theme=light] .ohead .ch,html[data-theme=light] .oth{border-color:var(-
     if (kind === 'percent' && val > 100) { toast('Foiz 100 dan oshmasin'); return; }
     var row = { code: code, kind: kind, value: val, min_total: mn, max_discount: kind === 'percent' ? mx : 0, max_uses: uses, once_per_customer: $('cf_once').checked, active: true,
       expires_at: exp ? new Date(exp + 'T23:59:59').toISOString() : null };
+    if ($('cf_shown') && $('cf_shown').checked) row.shown = true;
     var r = await sb.from('coupons').insert(row);
     if (r.error) { toast(/duplicate|unique/i.test(errMsg(r.error)) ? 'Bunday promokod allaqachon bor' : 'Xatolik: ' + errMsg(r.error)); return; }
     await loadCoupons(); cpRender(); toast('Kupon qo\'shildi: ' + code);
@@ -966,7 +969,7 @@ html[data-theme=light] .ohead .ch,html[data-theme=light] .oth{border-color:var(-
 
   /* ---------- Matnlar ---------- */
   var SUBS = [
-    ['chat', '💬', 'Yordam (chat)'], ['home', '🏠', 'Asosiy sahifa'], ['coupons', '🎟', 'Kuponlar'], ['ads', '📢', 'Reklama'], ['notify', '📣', 'Xabar yuborish'], ['reviews', '⭐', 'Sharhlar'], ['pay', '💳', "To'lov"],
+    ['chat', '💬', 'Yordam (chat)'], ['home', '🏠', 'Asosiy sahifa'], ['coupons', '🎟', 'Kuponlar'], ['ads', '📢', 'Reklama'], ['notify', '📣', 'Xabar yuborish'], ['reviews', '⭐', 'Sharhlar'], ['loyalty', '🎁', 'Bonus va daraja'], ['pay', '💳', "To'lov"],
     ['cats', '🗂', 'Kategoriyalar'], ['info', 'ℹ️', "«Ma'lumot» bo'limi"], ['calc', '💱', 'Yuan kursi']
   ];
   function subStatus(k){
@@ -977,6 +980,7 @@ html[data-theme=light] .ohead .ch,html[data-theme=light] .oth{border-color:var(-
     if (k === 'chat') return S._chok === false ? 'bazani yoqish kerak' : ((S.chUnread || 0) ? '<b style="color:var(--red)">' + S.chUnread + ' ta o\'qilmagan xabar</b>' : (S.threads || []).length + ' ta suhbat');
     if (k === 'notify') return S._anerr ? 'bazani yoqish kerak' : (S.anns || []).length + ' ta yuborilgan';
     if (k === 'reviews') return S._rverr ? 'bazani yoqish kerak' : (S.revs || []).length + ' ta sharh';
+    if (k === 'loyalty') { var lo = S.loyalty || {}; return (lo.on === false ? 'o\'chirilgan' : 'keshbek ' + (lo.cashback != null ? +lo.cashback : 2) + '% · taklif ' + money(lo.ref_bonus != null ? +lo.ref_bonus : 10000)); }
     if (k === 'pay') return pay.card ? 'karta kiritilgan · chek ' + (pay.required === false ? 'majburiy emas' : 'majburiy') : 'karta kiritilmagan';
     if (k === 'cats') return (S.cats || []).length + ' ta kategoriya';
     if (k === 'info') return (inf.steps || []).length + ' ta qadam' + (inf.note ? ' · eslatma bor' : '');
@@ -984,7 +988,7 @@ html[data-theme=light] .ohead .ch,html[data-theme=light] .oth{border-color:var(-
     return '';
   }
   function viewTexts(){
-    var ver = '<div class="muted" style="text-align:center;margin:22px 0 8px;font-size:12px">Admin ilova versiyasi: 2026.10.29-o (joyida qolish)</div>';
+    var ver = '<div class="muted" style="text-align:center;margin:22px 0 8px;font-size:12px">Admin ilova versiyasi: 2026.10.29-p (bonus va daraja)</div>';
     if (!S.sub) {
       return '<h2 style="margin-top:4px">Sozlamalar</h2>' + SUBS.map(function(x){
         return '<div class="card mn" data-sub="' + x[0] + '"><span class="ic">' + x[1] + '</span><div class="t"><b>' + x[2] + '</b><span class="muted">' + subStatus(x[0]) + '</span></div><span class="go">›</span></div>';
@@ -1007,6 +1011,21 @@ html[data-theme=light] .ohead .ch,html[data-theme=light] .oth{border-color:var(-
     else if (S.sub === 'chat') h += '<div id="chbox">' + chatHtml() + '</div>';
     else if (S.sub === 'notify') h += '<div id="nfbox">' + notifyHtml() + '</div>';
     else if (S.sub === 'reviews') h += '<div id="rvbox">' + reviewsAdmHtml() + '</div>';
+    else if (S.sub === 'loyalty') {
+      var lo = S.loyalty || {}, lv = (lo.levels && lo.levels.length ? lo.levels : [{ name: 'Bronza', emoji: '🥉', min: 0, extra: 0 }, { name: 'Kumush', emoji: '🥈', min: 1000000, extra: 1 }, { name: 'Oltin', emoji: '🥇', min: 3000000, extra: 2 }]);
+      while (lv.length < 3) lv.push({ name: '', emoji: '', min: '', extra: '' });
+      h += '<div class="muted" style="margin-bottom:10px">Buyurtma «Keldi» yoki «Yakunlandi» holatiga o\'tganda mijozga keshbek ball beriladi (1 ball = 1 so\'m). Bekor qilinsa, ball qaytariladi. Mijoz ballni keyingi xaridda ishlatadi. Do\'stini taklif qilsa, do\'sti birinchi xarid olganda ikkalasi bonus oladi. Bu bo\'lim ishlashi uchun profile2.sql ishga tushirilgan bo\'lishi kerak.</div>' +
+        '<label style="margin:0 0 10px;font-size:14px;color:var(--text)"><input type="checkbox" id="lo_on"' + (lo.on === false ? '' : ' checked') + '> Bonus tizimi yoqilgan</label>' +
+        '<label>Keshbek, % (xarid summasidan)</label><input id="lo_cb" type="number" inputmode="decimal" value="' + esc(lo.cashback != null ? lo.cashback : 2) + '">' +
+        '<label>Ballni ishlatish chegarasi, % (buyurtmaning eng ko\'pi shuncha foizini ball bilan to\'lash mumkin)</label><input id="lo_mu" type="number" inputmode="numeric" value="' + esc(lo.max_use != null ? lo.max_use : 50) + '">' +
+        '<label>Do\'st taklifi bonusi, ball (har ikkisiga)</label><input id="lo_rb" type="number" inputmode="numeric" value="' + esc(lo.ref_bonus != null ? lo.ref_bonus : 10000) + '">' +
+        '<h2>Darajalar</h2><div class="muted" style="margin-bottom:8px">Mijozning yetib kelgan xaridlari summasiga qarab daraja beriladi. «Qo\'shimcha %» — daraja uchun keshbekka qo\'shiladi. Bo\'sh qoldirilgan daraja hisobga olinmaydi.</div>' +
+        lv.slice(0, 3).map(function(x, i){
+          return '<div class="card"><div class="row"><div style="width:62px"><label>Belgi</label><input id="lo_e' + i + '" value="' + esc(x.emoji) + '" maxlength="4" style="text-align:center"></div><div style="flex:1"><label>Nomi</label><input id="lo_n' + i + '" value="' + esc(x.name) + '" maxlength="20"></div></div>' +
+            '<div class="row"><div style="flex:1"><label>Shu summadan boshlab, so\'m</label><input id="lo_m' + i + '" type="number" inputmode="numeric" value="' + esc(i === 0 ? 0 : x.min) + '"' + (i === 0 ? ' readonly' : '') + '></div><div style="width:110px"><label>Qo\'shimcha %</label><input id="lo_x' + i + '" type="number" inputmode="decimal" value="' + esc(x.extra) + '"></div></div></div>';
+        }).join('') +
+        '<button class="btn" id="sv_loyalty">Saqlash</button>';
+    }
     else if (S.sub === 'coupons') h += '<div id="cpadm">' + couponsHtml() + '</div>';
     else if (S.sub === 'ads') h += '<div id="adbox">' + adsHtml() + '</div>';
     else if (S.sub === 'pay') h +=
@@ -1044,6 +1063,16 @@ html[data-theme=light] .ohead .ch,html[data-theme=light] .oth{border-color:var(-
     } else if (k === 'info') {
       var info = { steps: $('tx_steps').value.split('\n').map(function(x){ return x.trim(); }).filter(Boolean), note: $('tx_note').value.trim() };
       rows = [{ key: 'info', value: info, updated_at: now }]; apply = function(){ S.info = info; };
+    } else if (k === 'loyalty') {
+      var lvs = [];
+      for (var i = 0; i < 3; i++) {
+        var nm = $('lo_n' + i).value.trim(); if (!nm) continue;
+        lvs.push({ name: nm, emoji: $('lo_e' + i).value.trim() || '⭐', min: i === 0 ? 0 : Math.max(0, parseFloat($('lo_m' + i).value) || 0), extra: Math.max(0, Math.min(50, parseFloat($('lo_x' + i).value) || 0)) });
+      }
+      if (!lvs.length) { toast('Kamida bitta daraja bo\'lsin'); return; }
+      lvs.sort(function(a, b){ return a.min - b.min; }); lvs[0].min = 0;
+      var lo2 = { on: $('lo_on').checked, cashback: Math.max(0, Math.min(50, parseFloat($('lo_cb').value) || 0)), max_use: Math.max(0, Math.min(100, parseFloat($('lo_mu').value) || 0)), ref_bonus: Math.max(0, parseFloat($('lo_rb').value) || 0), levels: lvs };
+      rows = [{ key: 'loyalty', value: lo2, updated_at: now }]; apply = function(){ S.loyalty = lo2; };
     } else if (k === 'calc') {
       var v = { rate: parseFloat($('ys_rate').value) || 1750, markup: parseFloat($('ys_mk').value) || 0 };
       rows = [{ key: 'calc', value: v, updated_at: now }]; apply = function(){ S.calc = v; };
@@ -1075,6 +1104,15 @@ html[data-theme=light] .ohead .ch,html[data-theme=light] .oth{border-color:var(-
   }
   async function loadAccounts(){
     try { var r = await sb.rpc('admin_customers'); if (!r.error && r.data) S.accts = r.data; } catch(e){}
+    try { var rl = await sb.rpc('admin_loyalty'); if (!rl.error && rl.data) { S.loyMap = {}; rl.data.forEach(function(x){ S.loyMap[x.customer_id] = x; }); } } catch(e){}
+  }
+  async function bonusAdj(id){
+    var v = prompt('Ball miqdori. Qo\'shish: 5000, ayirish: -5000'); if (v === null) return;
+    var n = parseFloat(String(v).replace(/\s/g, '')); if (!n || Math.abs(n) > 10000000) { toast('Miqdor noto\'g\'ri'); return; }
+    var note = prompt('Izoh (mijoz ko\'radi). Bo\'sh qoldirsangiz standart yoziladi:') || '';
+    var r = await sb.rpc('admin_bonus_adjust', { p_id: id, p_amount: n, p_note: note });
+    if (r.error) { toast('Xatolik: ' + errMsg(r.error)); return; }
+    await loadAccounts(); toast('Saqlandi. Balans: ' + Math.floor(+(r.data && r.data.balance) || 0).toLocaleString('ru')); var y = window.scrollY; render(); window.scrollTo(0, y);
   }
   async function resetPin(id){
     var pin = prompt('Mijozga yangi PIN bering (4–6 ta raqam):'); if (pin === null) return;
@@ -1103,13 +1141,13 @@ html[data-theme=light] .ohead .ch,html[data-theme=light] .oth{border-color:var(-
         '<div style="text-align:right"><b style="color:var(--gold2)">' + money(c.sum) + '</b><div class="muted">' + c.orders.length + ' ta buyurtma</div></div></div>' +
         (open ? '<div class="ord item">' + (a ? kv('Mijoz ID', 1000 + a.id) : kv('Hisob', 'ochmagan (eski buyurtma)')) + kv('Ism Familiya', c.name) + kv('Telefon', c.phone) + kv('Manzil', c.address || '—') +
           (a ? kv('Ro\'yxatdan o\'tgan', fmtDate(a.created_at)) + kv('Oxirgi kirish', a.last_login ? fmtDate(a.last_login) : '—') + kv('Holat', a.blocked ? 'Bloklangan' : 'Faol') : '') +
-          kv('Buyurtmalar soni', c.orders.length) + kv('Jami xarid (yuk bilan)', money(c.sum)) + kv('To\'langan', money(c.paid)) + '</div>' +
+          (a && S.loyMap && S.loyMap[a.id] ? kv('Daraja', esc(S.loyMap[a.id].level_emoji) + ' ' + esc(S.loyMap[a.id].level_name)) + kv('🎁 Ball balansi', Math.floor(+S.loyMap[a.id].balance || 0).toLocaleString('ru')) + kv('Taklif qilgan do\'stlari', S.loyMap[a.id].ref_count) : '') + kv('Buyurtmalar soni', c.orders.length) + kv('Jami xarid (yuk bilan)', money(c.sum)) + kv('To\'langan', money(c.paid)) + '</div>' +
           '<div class="muted" style="margin:10px 0 2px">Buyurtmalar tarixi:</div>' +
           c.orders.map(function(o){ var st = STATUS[o.status] || [o.status, '#9a978c'];
             return '<div class="kv" style="margin-top:6px;border-top:1px dashed var(--line);padding-top:6px"><b>#' + o.id + '</b> · ' + fmtDate(o.created_at) + ' · <span style="color:' + st[1] + '">' + esc(st[0]) + '</span> · ' + money(o.total) + (o.paid ? ' · <span style="color:#6fcf97">to\'langan</span>' : '') + '<br><span class="muted">' +
               (o.items || []).map(function(i){ return esc(i.name) + ' × ' + esc(i.qty); }).join(', ') + '</span></div>'; }).join('') +
           '<div class="row" style="margin-top:10px;flex-wrap:wrap"><a class="btn small ghost" href="tel:+' + d + '">📞 Qo\'ng\'iroq</a><a class="btn small ghost" target="_blank" rel="noopener" href="https://t.me/+' + d + '">✈️ Telegram</a>' +
-          (a ? '<button class="btn small ghost" data-custedit="' + a.id + '">✏️ Tahrirlash</button><button class="btn small ghost" data-resetpin="' + a.id + '">🔑 PIN tiklash</button><button class="btn small danger" data-block="' + a.id + '" data-to="' + (a.blocked ? '0' : '1') + '">' + (a.blocked ? 'Blokdan chiqarish' : '🚫 Bloklash') + '</button>' : '') + '</div>' : '') +
+          (a && S.loyMap ? '<button class="btn small ghost" data-bonusadj="' + a.id + '">🎁 Ball ±</button>' : '') + (a ? '<button class="btn small ghost" data-custedit="' + a.id + '">✏️ Tahrirlash</button><button class="btn small ghost" data-resetpin="' + a.id + '">🔑 PIN tiklash</button><button class="btn small danger" data-block="' + a.id + '" data-to="' + (a.blocked ? '0' : '1') + '">' + (a.blocked ? 'Blokdan chiqarish' : '🚫 Bloklash') + '</button>' : '') + '</div>' : '') +
         '</div>';
     }).join('') + (ctotal > list.length ? '<button class="btn ghost" data-more="c" style="margin-bottom:12px">Yana ko\'rsatish (' + (ctotal - list.length) + ')</button>' : '');
   }
@@ -1168,7 +1206,7 @@ html[data-theme=light] .ohead .ch,html[data-theme=light] .oth{border-color:var(-
 
   /* ---------- Hodisalar ---------- */
   document.addEventListener('click', async function(e){
-    var t = e.target.closest('#theme,[data-oimg],[data-otog],[data-chopen],[data-chback],[data-chattach],[data-chmedel],#ch_send,[data-nfattach],[data-nfmedel],#nf_send,[data-nfdel],[data-rvsave],[data-rvhide],[data-rvdel],[data-sub],[id^=sv_],[data-cpdel],#cf_add,[data-adcopy],[data-adadd],[data-addel],[data-admv],#ad_save,[data-tab],[data-cust],[data-more],[data-gocust],[data-custedit],#ce_save,[data-rcp],[data-resetpin],[data-block],[data-filter],[data-edit],[data-closemodal],[data-pickimg],[data-pickgal],[data-rmgal],[data-rmimg],[data-delprod],[data-delorder],#l_go,#pf_save,[data-pickgal],[data-rmgal],#cc_use,#cc_save,#tx_save,#logout,#refresh');
+    var t = e.target.closest('[data-bonusadj],#theme,[data-oimg],[data-otog],[data-chopen],[data-chback],[data-chattach],[data-chmedel],#ch_send,[data-nfattach],[data-nfmedel],#nf_send,[data-nfdel],[data-rvsave],[data-rvhide],[data-rvdel],[data-sub],[id^=sv_],[data-cpdel],#cf_add,[data-adcopy],[data-adadd],[data-addel],[data-admv],#ad_save,[data-tab],[data-cust],[data-more],[data-gocust],[data-custedit],#ce_save,[data-rcp],[data-resetpin],[data-block],[data-filter],[data-edit],[data-closemodal],[data-pickimg],[data-pickgal],[data-rmgal],[data-rmimg],[data-delprod],[data-delorder],#l_go,#pf_save,[data-pickgal],[data-rmgal],#cc_use,#cc_save,#tx_save,#logout,#refresh');
     if (!t) return;
     if (t.id === 'l_go') return doLogin();
     if (t.id === 'logout') return logout();
@@ -1195,6 +1233,7 @@ html[data-theme=light] .ohead .ch,html[data-theme=light] .oth{border-color:var(-
     if (t.id === 'pf_save') return saveProduct();
     if (t.id === 'cc_use') { var c = calcVals(); if (c.sell > 0) { $('pf_price').value = c.sell; toast('Narx qo\'yildi'); } else toast('Avval ¥ narxini kiriting'); return; }
     if (t.id === 'cc_save') return calcSave();
+    if (t.dataset.bonusadj) return bonusAdj(+t.dataset.bonusadj);
     if (t.dataset.oimg) return showBig(t.dataset.oimg);
     if (t.dataset.otog) { var oid = +t.dataset.otog; S.oopen[oid] = !S.oopen[oid]; var y0 = window.scrollY; render(); window.scrollTo(0, y0); return; }
     if (t.dataset.chopen) return chatOpen(+t.dataset.chopen);

@@ -988,7 +988,7 @@ html[data-theme=light] .ohead .ch,html[data-theme=light] .oth{border-color:var(-
     return '';
   }
   function viewTexts(){
-    var ver = '<div class="muted" style="text-align:center;margin:22px 0 8px;font-size:12px">Admin ilova versiyasi: 2026.10.29-q (somda bonus)</div>';
+    var ver = '<div class="muted" style="text-align:center;margin:22px 0 8px;font-size:12px">Admin ilova versiyasi: 2026.10.29-r (somda bonus)</div>';
     if (!S.sub) {
       return '<h2 style="margin-top:4px">Sozlamalar</h2>' + SUBS.map(function(x){
         return '<div class="card mn" data-sub="' + x[0] + '"><span class="ic">' + x[1] + '</span><div class="t"><b>' + x[2] + '</b><span class="muted">' + subStatus(x[0]) + '</span></div><span class="go">›</span></div>';
@@ -1018,7 +1018,7 @@ html[data-theme=light] .ohead .ch,html[data-theme=light] .oth{border-color:var(-
         '<label style="margin:0 0 10px;font-size:14px;color:var(--text)"><input type="checkbox" id="lo_on"' + (lo.on === false ? '' : ' checked') + '> Bonus tizimi yoqilgan</label>' +
         '<label>Keshbek, so\'m (har bir yetib kelgan buyurtma uchun)</label><input id="lo_cb" type="number" inputmode="numeric" value="' + esc(lo.cb_sum != null ? lo.cb_sum : 5000) + '">' +
         '<label>Keshbek berilishi uchun minimal buyurtma, so\'m (0 = har qanday buyurtmaga)</label><input id="lo_cm" type="number" inputmode="numeric" value="' + esc(lo.cb_min != null ? lo.cb_min : 0) + '">' +
-        '<label>Ballni ishlatish chegarasi, % (buyurtmaning eng ko\'pi shuncha foizini ball bilan to\'lash mumkin)</label><input id="lo_mu" type="number" inputmode="numeric" value="' + esc(lo.max_use != null ? lo.max_use : 50) + '">' +
+        '<label>Ballni ishlatish chegarasi, so\'m (mijoz bitta buyurtmada eng ko\'pi bilan shuncha ball ishlata oladi. 0 = chegarasiz)</label><input id="lo_mu" type="number" inputmode="numeric" value="' + esc(lo.max_sum != null ? lo.max_sum : 30000) + '">' +
         '<label>Do\'st taklifi bonusi, ball (har ikkisiga)</label><input id="lo_rb" type="number" inputmode="numeric" value="' + esc(lo.ref_bonus != null ? lo.ref_bonus : 10000) + '">' +
         '<h2>Darajalar</h2><div class="muted" style="margin-bottom:8px">Mijozning yetib kelgan xaridlari summasiga qarab daraja beriladi. «Qo\'shimcha, so\'m» — shu darajadagi mijozga har buyurtma uchun keshbekka qo\'shiladi. Bo\'sh qoldirilgan daraja hisobga olinmaydi.</div>' +
         lv.slice(0, 3).map(function(x, i){
@@ -1072,7 +1072,7 @@ html[data-theme=light] .ohead .ch,html[data-theme=light] .oth{border-color:var(-
       }
       if (!lvs.length) { toast('Kamida bitta daraja bo\'lsin'); return; }
       lvs.sort(function(a, b){ return a.min - b.min; });
-      var lo2 = { on: $('lo_on').checked, cb_sum: Math.max(0, Math.min(10000000, parseFloat($('lo_cb').value) || 0)), cb_min: Math.max(0, parseFloat($('lo_cm').value) || 0), max_use: Math.max(0, Math.min(100, parseFloat($('lo_mu').value) || 0)), ref_bonus: Math.max(0, parseFloat($('lo_rb').value) || 0), levels: lvs };
+      var lo2 = { on: $('lo_on').checked, cb_sum: Math.max(0, Math.min(10000000, parseFloat($('lo_cb').value) || 0)), cb_min: Math.max(0, parseFloat($('lo_cm').value) || 0), max_sum: Math.max(0, parseFloat($('lo_mu').value) || 0), ref_bonus: Math.max(0, parseFloat($('lo_rb').value) || 0), levels: lvs };
       rows = [{ key: 'loyalty', value: lo2, updated_at: now }]; apply = function(){ S.loyalty = lo2; };
     } else if (k === 'calc') {
       var v = { rate: parseFloat($('ys_rate').value) || 1750, markup: parseFloat($('ys_mk').value) || 0 };

@@ -630,14 +630,14 @@ html[data-theme=light] .btn.ghost{color:var(--text)}
       (bn ? '<div class="row" style="justify-content:space-between;color:#6fcf97"><span>🎁 Ball</span><span>−' + money(bn) + '</span></div>' : '');
     return h + '<div class="total"><span>Jami</span><span id="pay_total">' + money(net - bn) + '</span></div>';
   }
-  function bonusCap(net){ var L = state.loy; if (!L || !L.on) return 0; return Math.max(0, Math.min(Math.floor(+L.balance || 0), Math.floor(net * (+L.max_use || 0) / 100))); }
+  function bonusCap(net){ var L = state.loy; if (!L || !L.on) return 0; return Math.max(0, Math.min(Math.floor(+L.balance || 0), (+L.max_sum > 0 ? Math.floor(+L.max_sum) : Math.floor(net)), Math.floor(net))); }
   function bonusUse(net){ return state.useBonus ? bonusCap(net) : 0; }
   function bonusBoxHtml(net){
     var L = state.loy; if (!L || !L.on || !(+L.balance > 0)) return '';
     var cap = bonusCap(net);
     if (cap <= 0) return '<div class="hint" style="margin:0 0 8px">🎁 Sizda ' + money(L.balance).replace(' so\'m', '') + ' ball bor.</div>';
     return '<div class="bnbox"><label><input type="checkbox" id="bn_use"' + (state.useBonus ? ' checked' : '') + '> 🎁 Ball ishlatish: <b style="color:var(--gold2)">−' + money(cap) + '</b></label>' +
-      '<div class="muted" style="font-size:12px;margin-top:4px">Balans: ' + Math.floor(+L.balance).toLocaleString('ru') + ' ball (1 ball = 1 so\'m). Buyurtmaning ' + (+L.max_use) + '% igacha ishlatiladi.</div></div>';
+      '<div class="muted" style="font-size:12px;margin-top:4px">Balans: ' + Math.floor(+L.balance).toLocaleString('ru') + ' ball (1 ball = 1 so\'m). ' + (+L.max_sum > 0 ? 'Bitta buyurtmada ko\'pi bilan ' + Math.floor(+L.max_sum).toLocaleString('ru') + ' ball ishlatiladi.' : '') + '</div></div>';
   }
   function payNet(total){ var n = couponNet(total); return n - bonusUse(n); }
   function cpRefresh(){
@@ -847,7 +847,7 @@ html[data-theme=light] .btn.ghost{color:var(--text)}
     if (L && L.on) {
       var hist = (L.history || []).map(function(x){ return '<div class="hrow"><span>' + esc(x.note || '') + '<br><span class="muted" style="font-size:11px">' + new Date(x.created_at).toLocaleDateString('ru') + '</span></span><b style="color:' + (+x.amount >= 0 ? '#6fcf97' : 'var(--red)') + '">' + (+x.amount >= 0 ? '+' : '') + Math.floor(+x.amount).toLocaleString('ru') + '</b></div>'; }).join('');
       h += accHtml('bonus', '🎁', 'Bonus ballar', Math.floor(+L.balance || 0).toLocaleString('ru') + ' ball',
-        '<div class="hint" style="margin:0 0 10px">Har bir yetib kelgan buyurtmadan <b>' + Math.floor(+L.cb_sum + (lv ? +lv.extra : 0)).toLocaleString('ru') + ' ball</b> qaytadi' + (+L.cb_min > 0 ? ' (buyurtma ' + money(+L.cb_min) + ' dan kam bo\'lmasa)' : '') + '. 1 ball = 1 so\'m. Ballni savatda buyurtmaning ' + (+L.max_use) + '% igacha ishlatasiz.</div>' +
+        '<div class="hint" style="margin:0 0 10px">Har bir yetib kelgan buyurtmadan <b>' + Math.floor(+L.cb_sum + (lv ? +lv.extra : 0)).toLocaleString('ru') + ' ball</b> qaytadi' + (+L.cb_min > 0 ? ' (buyurtma ' + money(+L.cb_min) + ' dan kam bo\'lmasa)' : '') + '. 1 ball = 1 so\'m. Ballni savatda ' + (+L.max_sum > 0 ? 'bitta buyurtmada ko\'pi bilan ' + Math.floor(+L.max_sum).toLocaleString('ru') + ' ball' : 'xohlaganingizcha') + ' ishlatasiz.</div>' +
         (hist || '<div class="muted">Hozircha ball yo\'q. Birinchi xariddan keyin shu yerda ko\'rinadi.</div>'));
     }
     var cps = (L && L.coupons) || [];

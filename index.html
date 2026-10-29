@@ -196,6 +196,37 @@ html[data-theme=light] .card{box-shadow:0 1px 3px rgba(0,0,0,.06)}
 html[data-theme=light] .sheet-bg{background:rgba(0,0,0,.35)}
 html[data-theme=light] .seg button.on,html[data-theme=light] .btn,html[data-theme=light] .cb.me{color:#fff}
 html[data-theme=light] .btn.ghost{color:var(--text)}
+
+/* ---- Profil 2.0 ---- */
+.phero{position:relative;border-radius:20px;padding:16px;margin-bottom:10px;background:linear-gradient(135deg,var(--card),var(--card2));border:1px solid var(--lvc,var(--gold));overflow:hidden}
+.phero .av{width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,var(--gold2),var(--gold));color:#1a1405;display:grid;place-items:center;font-size:30px;font-weight:800;border:0;flex:none;position:relative;font-family:inherit}
+.phero .av i{position:absolute;right:-2px;bottom:-2px;width:22px;height:22px;border-radius:50%;background:var(--card);border:1px solid var(--line);font-size:11px;display:grid;place-items:center;font-style:normal}
+.lvp{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:800;padding:3px 10px;border-radius:12px;border:1px solid var(--lvc,var(--gold));color:var(--text);background:var(--card)}
+.pbar{height:8px;border-radius:5px;background:var(--card2);border:1px solid var(--line);overflow:hidden;margin:10px 0 4px}
+.pbar i{display:block;height:100%;background:linear-gradient(90deg,var(--gold2),var(--gold));border-radius:5px}
+.qgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}
+.qgrid button{background:var(--card);border:1px solid var(--line);color:var(--text);border-radius:14px;padding:12px 8px;font-family:inherit;font-size:13px;font-weight:700;display:flex;flex-direction:column;align-items:center;gap:4px}
+.qgrid button span{font-size:22px}
+.acc{background:var(--card);border:1px solid var(--line);border-radius:14px;margin-bottom:8px;overflow:hidden}
+.acc>button{width:100%;background:none;border:0;color:var(--text);font-family:inherit;font-size:15px;font-weight:700;padding:14px;display:flex;align-items:center;gap:10px;text-align:left}
+.acc>button b{flex:1}
+.acc>button em{font-style:normal;color:var(--muted);font-size:12px;font-weight:600}
+.acc>button u{text-decoration:none;color:var(--muted);transition:transform .15s}
+.acc.open>button u{transform:rotate(90deg)}
+.acc .ab{padding:0 14px 14px}
+.avpick{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.avpick button{width:42px;height:42px;border-radius:12px;border:1px solid var(--line);background:var(--card);font-size:22px;font-family:inherit}
+.hrow{display:flex;justify-content:space-between;gap:8px;padding:7px 0;border-top:1px dashed var(--line);font-size:13px}
+.hrow:first-child{border-top:0}
+.cpn{border:1px dashed var(--gold);border-radius:12px;padding:10px;margin-bottom:8px;display:flex;gap:10px;align-items:center}
+.cpn b{font-size:15px;letter-spacing:.5px}
+.bnbox{background:var(--card);border:1px solid var(--gold);border-radius:12px;padding:10px 12px;margin-bottom:10px;font-size:14px}
+.bnbox label{display:flex;gap:8px;align-items:center;margin:0;font-size:14px;color:var(--text)}
+.bnbox input{width:auto;margin:0}
+.addrrow{display:flex;gap:8px;align-items:flex-start;padding:8px 0;border-top:1px dashed var(--line)}
+.addrrow:first-child{border-top:0}
+.addrrow .t{flex:1;min-width:0;font-size:14px;line-height:1.4}
+.addrrow button{background:none;border:1px solid var(--line);color:var(--muted);border-radius:8px;padding:4px 8px;font-size:12px;font-family:inherit}
 </style>
 </head>
 <body>
@@ -221,7 +252,7 @@ html[data-theme=light] .btn.ghost{color:var(--text)}
   var DEFAULT_SHOP = { name: 'qSHOP', tagline: 'Xitoy tovarlari, guruh bilan arzon', hero_title: "Do'stlar bilan olsangiz — arzonroq",
     hero_text: "Mahsulotni tanlang, guruhga qo'shiling va do'stlaringizni chaqiring. Guruh to'lgach buyurtma Xitoydan yo'lga chiqadi.", admin_telegram: '' };
   var DEFAULT_INFO = { steps: [], note: '' };
-  var state = { products: [], shop: DEFAULT_SHOP, info: DEFAULT_INFO, categories: [], pay: {}, coupon: null, ads: {}, help: 'chat', chatMsgs: [], chatLast: 0, chatUnread: 0, chImg: null, stats: {}, liked: {}, anns: [], rv: null, rvStar: 0, rcpt: null, cat: '', q: '', tab: 'home', cart: [], orders: [], loaded: false };
+  var state = { loy: null, useBonus: false, acc: '', pickAv: false, products: [], shop: DEFAULT_SHOP, info: DEFAULT_INFO, categories: [], pay: {}, coupon: null, ads: {}, help: 'chat', chatMsgs: [], chatLast: 0, chatUnread: 0, chImg: null, stats: {}, liked: {}, anns: [], rv: null, rvStar: 0, rcpt: null, cat: '', q: '', tab: 'home', cart: [], orders: [], loaded: false };
   var sb = null;
   try { if (window.supabase && window.QSHOP && QSHOP.SUPABASE_URL) sb = window.supabase.createClient(QSHOP.SUPABASE_URL, QSHOP.SUPABASE_KEY); } catch(e){}
 
@@ -565,9 +596,9 @@ html[data-theme=light] .btn.ghost{color:var(--text)}
     h += '<h2>Buyurtma ma\'lumotlari</h2>' +
       '<label>Ismingiz</label><input id="f_name" autocomplete="name" value="' + esc(u.name) + '">' +
       '<label>Telefon raqam</label><input id="f_phone" type="tel" autocomplete="tel" placeholder="+998" value="' + esc(u.phone) + '">' +
-      '<label>Manzil (viloyat, shahar, ko\'cha)</label><input id="f_addr" autocomplete="street-address" value="' + esc(u.addr) + '">' +
+      '<label>Manzil (viloyat, shahar, ko\'cha)</label>' + addrChips() + '<input id="f_addr" autocomplete="street-address" value="' + esc(u.addr) + '">' +
       '<label>Izoh (rang, o\'lcham...)</label><textarea id="f_note" rows="2"></textarea>' +
-      payBoxHtml(couponNet(total)) +
+      payBoxHtml(payNet(total)) +
       '<button class="btn" id="send">Buyurtma yuborish</button>';
     return h;
   }
@@ -591,14 +622,27 @@ html[data-theme=light] .btn.ghost{color:var(--text)}
     } else {
       h += '<div class="row" style="gap:8px;margin-bottom:10px"><input id="cp_in" placeholder="🎟 Promokod bormi?" autocapitalize="characters" autocomplete="off" style="margin:0;flex:1"><button class="btn small" id="cp_apply" style="width:auto">Qo\'llash</button></div><div id="cp_msg" class="hint" style="margin:-4px 0 8px"></div>';
     }
-    var disc = couponDisc(c, total);
-    if (disc) h += '<div class="row" style="justify-content:space-between;color:var(--muted)"><span>Tovarlar</span><span>' + money(total) + '</span></div><div class="row" style="justify-content:space-between;color:#6fcf97"><span>Kupon</span><span>−' + money(disc) + '</span></div>';
-    return h + '<div class="total"><span>Jami</span><span id="pay_total">' + money(total - disc) + '</span></div>';
+    var disc = couponDisc(c, total), net = total - disc, bn = bonusUse(net);
+    h += bonusBoxHtml(net);
+    if (disc || bn) h += '<div class="row" style="justify-content:space-between;color:var(--muted)"><span>Tovarlar</span><span>' + money(total) + '</span></div>' +
+      (disc ? '<div class="row" style="justify-content:space-between;color:#6fcf97"><span>Kupon</span><span>−' + money(disc) + '</span></div>' : '') +
+      (bn ? '<div class="row" style="justify-content:space-between;color:#6fcf97"><span>🎁 Ball</span><span>−' + money(bn) + '</span></div>' : '');
+    return h + '<div class="total"><span>Jami</span><span id="pay_total">' + money(net - bn) + '</span></div>';
   }
+  function bonusCap(net){ var L = state.loy; if (!L || !L.on) return 0; return Math.max(0, Math.min(Math.floor(+L.balance || 0), Math.floor(net * (+L.max_use || 0) / 100))); }
+  function bonusUse(net){ return state.useBonus ? bonusCap(net) : 0; }
+  function bonusBoxHtml(net){
+    var L = state.loy; if (!L || !L.on || !(+L.balance > 0)) return '';
+    var cap = bonusCap(net);
+    if (cap <= 0) return '<div class="hint" style="margin:0 0 8px">🎁 Sizda ' + money(L.balance).replace(' so\'m', '') + ' ball bor.</div>';
+    return '<div class="bnbox"><label><input type="checkbox" id="bn_use"' + (state.useBonus ? ' checked' : '') + '> 🎁 Ball ishlatish: <b style="color:var(--gold2)">−' + money(cap) + '</b></label>' +
+      '<div class="muted" style="font-size:12px;margin-top:4px">Balans: ' + Math.floor(+L.balance).toLocaleString('ru') + ' ball (1 ball = 1 so\'m). Buyurtmaning ' + (+L.max_use) + '% igacha ishlatiladi.</div></div>';
+  }
+  function payNet(total){ var n = couponNet(total); return n - bonusUse(n); }
   function cpRefresh(){
     var b = $('cpbox'); if (!b) return; var t = cartTotal();
     b.innerHTML = cpBoxHtml(t);
-    var pa = $('pay_amt'); if (pa) pa.textContent = money(couponNet(t));
+    var pa = $('pay_amt'); if (pa) pa.textContent = money(payNet(t));
   }
   async function applyCoupon(){
     var inp = $('cp_in'), code = inp ? inp.value.trim() : '', msg = $('cp_msg');
@@ -640,14 +684,14 @@ html[data-theme=light] .btn.ghost{color:var(--text)}
     return '<input type="file" id="rc_late" accept="image/*" style="display:none">' + state.orders.slice().reverse().map(function(o){
       return '<div class="order"><b>#' + esc(o.no) + '</b> · ' + esc(o.date) + '<br>' +
         o.items.map(function(i){ var sp = splitOpt(i.name); return '<div style="margin-bottom:6px"><b>' + esc(sp.name) + '</b> × ' + i.qty + (i.group ? ' (guruh)' : '') + sp.opts.map(function(x){ return '<div class="muted" style="margin-left:10px">' + esc(x) + '</div>'; }).join('') + '</div>'; }).join('') +
-        '<br>Tovarlar: <b>' + money(o.total + (+o.discount || 0)) + '</b><br>' + (+o.discount > 0 ? '🎟 Kupon ' + esc(o.coupon) + ': <b style="color:#6fcf97">−' + money(o.discount) + '</b><br>' : '') + shipHtml(o) + trackHtml(o) + statusHtml(o.no) + orderPayHtml(o) + '</div>';
+        '<br>Tovarlar: <b>' + money(o.total + (+o.discount || 0) + (+o.bonus || 0)) + '</b><br>' + (+o.discount > 0 ? '🎟 Kupon ' + esc(o.coupon) + ': <b style="color:#6fcf97">−' + money(o.discount) + '</b><br>' : '') + (+o.bonus > 0 ? '🎁 Ball: <b style="color:#6fcf97">−' + money(o.bonus) + '</b><br>' : '') + shipHtml(o) + trackHtml(o) + statusHtml(o.no) + orderPayHtml(o) + '</div>';
     }).join('');
   }
 
   /* ---------- Hisob (telefon + PIN) ---------- */
   function fmtPhone(p){ var d = String(p || '').replace(/\D/g, ''); return d.length === 12 ? '+' + d.slice(0, 3) + ' ' + d.slice(3, 5) + ' ' + d.slice(5, 8) + ' ' + d.slice(8, 10) + ' ' + d.slice(10) : String(p || ''); }
   function clearSession(){
-    state.token = ''; state.me = null; save('qs_token', ''); save('qs_me', null);
+    state.token = ''; state.me = null; state.loy = null; save('qs_token', ''); save('qs_me', null); save('qs_loy', null);
     state.orders = state.orders.filter(function(o){ return !o.server; }); save('qs_orders', state.orders);
   }
   function setSession(d){
@@ -660,7 +704,7 @@ html[data-theme=light] .btn.ghost{color:var(--text)}
       if (r.error || !r.data) return;
       var srv = r.data.map(function(x){
         state.statuses[x.id] = x.status; state.ship[x.id] = +x.shipping || 0;
-        return { no: x.id, date: new Date(x.created_at).toLocaleString('ru'), items: x.items || [], total: +x.total, discount: +x.discount || 0, coupon: x.coupon || '', track: x.track || '', phone: state.me ? state.me.phone : '', server: true, thumb: x.receipt_thumb || '', paid: !!x.paid };
+        return { no: x.id, date: new Date(x.created_at).toLocaleString('ru'), items: x.items || [], total: +x.total, discount: +x.discount || 0, bonus: +x.bonus_used || 0, coupon: x.coupon || '', track: x.track || '', phone: state.me ? state.me.phone : '', server: true, thumb: x.receipt_thumb || '', paid: !!x.paid };
       });
       var ids = {}; srv.forEach(function(o){ ids[o.no] = 1; });
       var local = state.orders.filter(function(o){ return !o.server && !ids[o.no]; });
@@ -675,13 +719,13 @@ html[data-theme=light] .btn.ghost{color:var(--text)}
       if (r.error) return;
       if (r.data && r.data.error) { clearSession(); if (state.tab === 'profile' || state.tab === 'cart') render(); return; }
       if (r.data && r.data.profile) { state.me = r.data.profile; save('qs_me', state.me); }
-      loadMyOrders();
+      loadMyOrders(); loadLoy();
     } catch(e){}
   }
   async function afterAuth(d){
     setSession(d); toast('Xush kelibsiz, ' + d.profile.name + '!');
     var next = state.next; state.next = '';
-    state.tab = (next && state.cart.length) ? next : 'profile'; render(); loadMyOrders();
+    state.loy = null; state.tab = (next && state.cart.length) ? next : 'profile'; render(); loadMyOrders(); loadLoy();
   }
   async function busy(id, label, fn){
     var b = $(id); if (!b) return; var t = b.textContent; b.disabled = true; b.textContent = label;
@@ -705,13 +749,13 @@ html[data-theme=light] .btn.ghost{color:var(--text)}
     if (!/^\d{4,6}$/.test(pin)) { toast('PIN 4–6 ta raqamdan iborat bo\'lsin'); return; }
     if (pin !== pin2) { toast('PIN lar bir xil emas'); return; }
     return busy('p_reg', 'Yaratilmoqda...', async function(){
-      var r = await sb.rpc('c_register', { p_phone: phone, p_pin: pin, p_name: name, p_address: addr });
+      var rf = load('qs_ref', ''); var r = await sb.rpc('c_register', Object.assign({ p_phone: phone, p_pin: pin, p_name: name, p_address: addr }, rf ? { p_ref: rf } : {}));
       if (r.error) { toast(r.error.message || 'Xatolik'); return; }
-      await afterAuth(r.data);
+      save('qs_ref', ''); await afterAuth(r.data);
     });
   }
   function saveProfile(){
-    var name = $('a_name').value.trim(), addr = $('a_addr').value.trim();
+    var name = $('a_name').value.trim(), addr = (state.me && state.me.address) || '';
     if (!name) { toast('Ismingizni kiriting'); return; }
     return busy('p_save', 'Saqlanmoqda...', async function(){
       var r = await sb.rpc('c_update', { p_token: state.token, p_name: name, p_address: addr });
@@ -742,7 +786,7 @@ html[data-theme=light] .btn.ghost{color:var(--text)}
       var tg = tgName(), reg = state.pmode === 'reg';
       var h = '<div class="chips" style="margin-bottom:12px"><button class="chip ' + (reg ? '' : 'on') + '" data-pm="login">Kirish</button><button class="chip ' + (reg ? 'on' : '') + '" data-pm="reg">Ro\'yxatdan o\'tish</button></div>';
       if (reg) {
-        return h + '<label>Ism Familiya</label><input id="a_name" autocomplete="name">' +
+        return h + (load('qs_ref', '') ? '<div class="bnbox" style="margin-bottom:10px">🎁 Siz do\'stingiz taklifi bilan keldingiz. Birinchi xaridingiz yetib kelgach, ikkalangizga bonus ball beriladi.</div>' : '') + '<label>Ism Familiya</label><input id="a_name" autocomplete="name">' +
           '<label>Telefon raqam</label><input id="a_phone" type="tel" autocomplete="tel" placeholder="+998">' +
           '<label>Manzil (viloyat, shahar, ko\'cha) — ixtiyoriy</label><input id="a_addr" autocomplete="street-address">' +
           '<label>PIN (4–6 ta raqam)</label><input id="a_pin" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password">' +
@@ -755,30 +799,129 @@ html[data-theme=light] .btn.ghost{color:var(--text)}
         '<button class="btn" id="p_login">Kirish</button>' +
         '<p class="hint">PIN esdan chiqdimi? ' + (tg ? '<a style="color:var(--gold2)" target="_blank" rel="noopener" href="https://t.me/' + encodeURIComponent(tg) + '">Telegramda yozing</a>, yangi PIN beramiz.' : 'Admin bilan bog\'laning, yangi PIN beradi.') + '</p>';
     }
-    var m = state.me, cnt = state.orders.filter(function(o){ return o.server; }).length;
+    return profileHtml();
+  }
+  var AVATARS = ['🙂', '😎', '🦊', '🐼', '🦁', '🐯', '🐸', '🦄', '🐱', '🐶', '🌸', '⚡', '🔥', '💎', '🚀', '🎧'];
+  var LVC = { '🥉': '#cd7f32', '🥈': '#b8bcc4', '🥇': '#e6b800' };
+  function accHtml(k, ico, title, hint, body){
+    var open = state.acc === k;
+    return '<div class="acc' + (open ? ' open' : '') + '" id="acc_' + k + '"><button data-pf="acc:' + k + '"><span style="font-size:20px">' + ico + '</span><b>' + title + '</b>' + (hint ? '<em>' + hint + '</em>' : '') + '<u>›</u></button>' + (open ? '<div class="ab">' + body + '</div>' : '') + '</div>';
+  }
+  function cpDescC(c){
+    var v = c.kind === 'percent' ? (+c.value) + '% chegirma' : money(c.value) + ' chegirma';
+    var a = [v]; if (+c.min_total > 0) a.push('kamida ' + money(c.min_total)); if (c.kind === 'percent' && +c.max_discount > 0) a.push('ko\'pi bilan ' + money(c.max_discount));
+    if (c.expires_at) a.push('muddati: ' + new Date(c.expires_at).toLocaleDateString('ru'));
+    return a.join(' · ');
+  }
+  function refLink(){ var code = state.me && state.me.ref_code; if (!code) return ''; return location.origin + location.pathname.replace(/index\.html$/, '') + '?ref=' + encodeURIComponent(code); }
+  function addrList(){ var l = state.me && state.me.addresses; return Array.isArray(l) ? l : []; }
+  function addrChips(){
+    var l = addrList(); if (l.length < 2) return '';
+    return '<div class="chips" style="margin-bottom:6px">' + l.map(function(a, i){ return '<button type="button" class="chip" data-pf="useaddr:' + i + '">📍 ' + esc(a.label) + '</button>'; }).join('') + '</div>';
+  }
+  function profileHtml(){
+    var m = state.me, L = state.loy, lv = L && L.level;
     var live = state.orders.filter(function(o){ return o.server && state.statuses[o.no] !== 'cancelled'; });
     var spent = live.reduce(function(a, o){ return a + (+o.total || 0) + (+(state.ship || {})[o.no] || 0); }, 0);
-    var paidSum = live.filter(function(o){ return o.paid; }).reduce(function(a, o){ return a + (+o.total || 0) + (+(state.ship || {})[o.no] || 0); }, 0);
     var cid = 1000 + (+m.id || 0), tg2 = tgName();
-    var phoneMsg = 'Salom! Mening ID: ' + cid + ', ism: ' + m.name + ', hozirgi raqamim: ' + fmtPhone(m.phone) + '. Raqamimni yangisiga o\'zgartirib bering: +998';
-    return '<div class="card" style="padding:16px;flex-direction:row;gap:14px;align-items:center;margin-bottom:10px;cursor:default"><div style="flex:none;width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,var(--gold2),var(--gold));color:#1a1405;display:grid;place-items:center;font-size:24px;font-weight:800">' + esc((m.name || '?').charAt(0).toUpperCase()) + '</div>' +
-      '<div style="min-width:0"><div style="font-weight:800;font-size:17px">' + esc(m.name) + '</div><div class="muted" style="font-size:13px">' + esc(fmtPhone(m.phone)) + '</div>' +
-      '<div style="margin-top:4px"><span class="tag" style="font-size:12px">ID: ' + cid + '</span> <button class="btn small ghost" style="padding:2px 10px;font-size:12px" data-copy="' + cid + '">Nusxalash</button></div></div></div>' +
-      '<div class="row" style="gap:8px;margin-bottom:6px"><div class="card" style="flex:1;padding:10px;text-align:center;cursor:default"><b style="font-size:18px">' + state.orders.filter(function(o){ return o.server; }).length + '</b><div class="muted" style="font-size:11px">Buyurtma</div></div>' +
-      '<div class="card" style="flex:1;padding:10px;text-align:center;cursor:default"><b style="font-size:14px;color:var(--gold2)">' + money(spent) + '</b><div class="muted" style="font-size:11px">Jami xarid</div></div>' +
-      '<div class="card" style="flex:1;padding:10px;text-align:center;cursor:default"><b style="font-size:14px;color:#6fcf97">' + money(paidSum) + '</b><div class="muted" style="font-size:11px">To\'langan</div></div></div>' +
-      '<div class="muted" style="font-size:12px;margin-bottom:6px">ID raqamingizni admin so\'rasa, shuni ayting — hisobingizni tez topadi.</div>' +
-      '<h2>Mening ma\'lumotlarim</h2>' +
+    var lvc = lv ? (LVC[lv.emoji] || 'var(--gold)') : 'var(--gold)';
+    var av = m.avatar ? esc(m.avatar) : esc((m.name || '?').charAt(0).toUpperCase());
+    var h = '<div class="phero" style="--lvc:' + lvc + '"><div class="row" style="gap:14px;align-items:center"><button class="av" data-pf="avtoggle">' + av + '<i>✏️</i></button>' +
+      '<div style="min-width:0;flex:1"><div style="font-weight:800;font-size:18px;line-height:1.2">' + esc(m.name) + '</div><div class="muted" style="font-size:13px;margin:2px 0 6px">' + esc(fmtPhone(m.phone)) + '</div>' +
+      '<div class="row" style="gap:6px;flex-wrap:wrap">' + (lv ? '<span class="lvp">' + esc(lv.emoji) + ' ' + esc(lv.name) + '</span>' : '') +
+      '<span class="tag" style="margin:0;font-size:12px">ID: ' + cid + '</span><button class="btn small ghost" style="padding:2px 10px;font-size:12px" data-copy="' + cid + '">Nusxalash</button></div></div></div>';
+    if (state.pickAv) h += '<div class="avpick">' + AVATARS.map(function(e){ return '<button data-pf="av:' + e + '">' + e + '</button>'; }).join('') + '<button data-pf="av:" style="font-size:12px;width:auto;padding:0 10px">Harf</button></div>';
+    if (lv) {
+      var need = lv.need, pct = need == null ? 100 : Math.max(4, Math.min(100, Math.round((lv.spend - lv.min) / Math.max(1, (lv.next_min - lv.min)) * 100)));
+      h += '<div class="pbar"><i style="width:' + pct + '%"></i></div><div class="muted" style="font-size:12px">' +
+        (need == null ? '🏆 Siz eng yuqori darajadasiz!' : esc(lv.next_emoji) + ' ' + esc(lv.next_name) + ' darajasigacha yana <b>' + money(need) + '</b> xarid qoldi') +
+        (+lv.extra > 0 ? ' · keshbek +' + (+lv.extra) + '%' : '') + '</div>';
+    }
+    h += '</div>';
+    h += '<div class="row" style="gap:8px;margin-bottom:6px"><div class="card" style="flex:1;padding:10px;text-align:center;cursor:default"><b style="font-size:18px">' + state.orders.filter(function(o){ return o.server; }).length + '</b><div class="muted" style="font-size:11px">Buyurtma</div></div>' +
+      (L && L.on ? '<div class="card" style="flex:1;padding:10px;text-align:center;cursor:default"><b style="font-size:16px;color:#6fcf97">' + Math.floor(+L.balance || 0).toLocaleString('ru') + '</b><div class="muted" style="font-size:11px">🎁 Ball</div></div>' : '') +
+      '<div class="card" style="flex:1;padding:10px;text-align:center;cursor:default"><b style="font-size:14px;color:var(--gold2)">' + money(spent) + '</b><div class="muted" style="font-size:11px">Jami xarid</div></div></div>';
+    h += '<div class="qgrid"><button data-tab="orders"><span>📦</span>Buyurtmalarim</button><button data-pf="fav"><span>❤️</span>Sevimlilar</button>' +
+      '<button data-pf="acc:coupons"><span>🎟</span>Kuponlarim' + (L && L.coupons && L.coupons.length ? ' (' + L.coupons.length + ')' : '') + '</button><button data-tab="info"><span>💬</span>Yordam</button></div>';
+    if (L && L.on) {
+      var hist = (L.history || []).map(function(x){ return '<div class="hrow"><span>' + esc(x.note || '') + '<br><span class="muted" style="font-size:11px">' + new Date(x.created_at).toLocaleDateString('ru') + '</span></span><b style="color:' + (+x.amount >= 0 ? '#6fcf97' : 'var(--red)') + '">' + (+x.amount >= 0 ? '+' : '') + Math.floor(+x.amount).toLocaleString('ru') + '</b></div>'; }).join('');
+      h += accHtml('bonus', '🎁', 'Bonus ballar', Math.floor(+L.balance || 0).toLocaleString('ru') + ' ball',
+        '<div class="hint" style="margin:0 0 10px">Har bir yetib kelgan xariddan <b>' + (+L.cashback + (lv ? +lv.extra : 0)) + '%</b> ball qaytadi. 1 ball = 1 so\'m. Ballni savatda buyurtmaning ' + (+L.max_use) + '% igacha ishlatasiz.</div>' +
+        (hist || '<div class="muted">Hozircha ball yo\'q. Birinchi xariddan keyin shu yerda ko\'rinadi.</div>'));
+    }
+    var cps = (L && L.coupons) || [];
+    h += accHtml('coupons', '🎟', 'Kuponlarim', cps.length ? cps.length + ' ta' : '',
+      cps.length ? cps.map(function(c){ return '<div class="cpn"><div style="flex:1;min-width:0"><b>' + esc(c.code) + '</b><div class="muted" style="font-size:12px">' + esc(cpDescC(c)) + '</div></div><button class="btn small ghost" data-copy="' + esc(c.code) + '">Nusxalash</button></div>'; }).join('') + '<div class="hint" style="margin:4px 0 0">Kodni savatdagi «Promokod» maydoniga yozing.</div>'
+      : '<div class="muted">Hozircha faol kupon yo\'q. Yangi kuponlar shu yerda va «Xabarlar» da chiqadi.</div>');
+    if (L && m.ref_code) {
+      var link = refLink(), shareTxt = 'qatti.SHOP — Xitoy tovarlari arzon narxda! Mening havolam orqali kiring: ';
+      h += accHtml('ref', '👥', 'Do\'stni taklif qilish', L.ref_count ? L.ref_count + ' ta' : '',
+        '<div class="hint" style="margin:0 0 10px">Do\'stingiz havolangiz orqali ro\'yxatdan o\'tib, birinchi xaridini olsa, ikkalangizga <b>' + Math.floor(+L.ref_bonus || 0).toLocaleString('ru') + ' ball</b> beriladi.</div>' +
+        '<div class="cpn"><div style="flex:1;min-width:0;word-break:break-all;font-size:13px">' + esc(link) + '</div><button class="btn small ghost" data-copy="' + esc(link) + '">Nusxalash</button></div>' +
+        '<div class="row" style="gap:8px"><a class="btn small" style="flex:1;text-align:center" target="_blank" rel="noopener" href="https://t.me/share/url?url=' + encodeURIComponent(link) + '&text=' + encodeURIComponent(shareTxt) + '">✈️ Telegramda ulashish</a>' +
+        '<button class="btn small ghost" data-pf="share" style="flex:1">📤 Ulashish</button></div>' +
+        '<div class="muted" style="margin-top:10px;font-size:12px">Ro\'yxatdan o\'tgan do\'stlar: <b>' + (+L.ref_count || 0) + '</b> · Xarid qilganlari: <b>' + (+L.ref_done || 0) + '</b></div>');
+    }
+    var al = addrList();
+    h += accHtml('addr', '📍', 'Manzillarim', al.length ? al.length + ' ta' : '',
+      (al.length ? al.map(function(a, i){ return '<div class="addrrow"><div class="t"><b>' + esc(a.label) + '</b>' + (i === 0 ? ' <span class="tag" style="margin:0">asosiy</span>' : '') + '<br><span class="muted">' + esc(a.text) + '</span></div>' +
+        (i > 0 ? '<button data-pf="addrmain:' + i + '">Asosiy</button>' : '') + '<button data-pf="addrdel:' + i + '" style="color:var(--red)">✕</button></div>'; }).join('') : '<div class="muted" style="margin-bottom:6px">Manzil qo\'shilmagan.</div>') +
+      (al.length < 5 ? '<div style="margin-top:10px"><div class="chips" style="margin-bottom:6px"><button class="chip on" data-pf="lbl:Uy" id="lb_Uy">Uy</button><button class="chip" data-pf="lbl:Ish" id="lb_Ish">Ish</button><button class="chip" data-pf="lbl:Boshqa" id="lb_Boshqa">Boshqa</button></div>' +
+        '<input id="ad_text" placeholder="Viloyat, shahar, ko\'cha, uy" autocomplete="off"><button class="btn" id="ad_add" data-pf="addradd">Manzil qo\'shish</button></div>' : '<div class="muted" style="margin-top:8px">Ko\'pi bilan 5 ta manzil.</div>'));
+    h += accHtml('me', '✏️', 'Ma\'lumotlarim', '',
       '<label>Ism Familiya</label><input id="a_name" autocomplete="name" value="' + esc(m.name) + '">' +
-      '<label>Manzil</label><input id="a_addr" autocomplete="street-address" value="' + esc(m.address) + '">' +
       '<div class="muted" style="margin:-4px 0 10px;font-size:12px">Telefon raqam hisobingizning kaliti. Uni o\'zgartirish uchun adminga so\'rov yuboring.</div>' +
-      (tg2 ? '<a class="btn ghost" style="margin-bottom:10px" target="_blank" rel="noopener" href="https://t.me/' + encodeURIComponent(tg2) + '?text=' + encodeURIComponent(phoneMsg) + '">📞 Raqamni o\'zgartirish so\'rovi</a>' : '') +
-      '<button class="btn" id="p_save">Saqlash</button>' +
-      '<h2 style="margin-top:22px">PIN ni o\'zgartirish</h2>' +
+      (tg2 ? '<a class="btn ghost" style="margin-bottom:10px" target="_blank" rel="noopener" href="https://t.me/' + encodeURIComponent(tg2) + '?text=' + encodeURIComponent('Salom! Mening ID: ' + cid + ', ism: ' + m.name + ', hozirgi raqamim: ' + fmtPhone(m.phone) + '. Raqamimni yangisiga o\'zgartirib bering: +998') + '">📞 Raqamni o\'zgartirish so\'rovi</a>' : '') +
+      '<button class="btn" id="p_save">Saqlash</button>');
+    h += accHtml('sec', '🔐', 'Xavfsizlik', '',
       '<label>Eski PIN</label><input id="a_old" type="password" inputmode="numeric" maxlength="6" autocomplete="current-password">' +
       '<label>Yangi PIN (4–6 ta raqam)</label><input id="a_new" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password">' +
       '<button class="btn ghost" id="p_pin">PIN ni o\'zgartirish</button>' +
-      '<button class="btn ghost" style="margin-top:22px;color:var(--red)" id="p_logout">Hisobdan chiqish</button>';
+      '<button class="btn ghost" style="margin-top:18px;color:var(--red)" data-pf="delacc">🗑 Hisobni o\'chirish</button>');
+    h += '<button class="btn ghost" style="margin-top:10px;color:var(--red)" id="p_logout">Hisobdan chiqish</button>';
+    return h;
+  }
+  async function loadLoy(){
+    if (!sb || !state.token || !state.me) return;
+    try {
+      var r = await sb.rpc('c_loyalty', { p_token: state.token });
+      if (r.error || !r.data || r.data.error) return;
+      state.loy = r.data; save('qs_loy', r.data);
+      if (state.tab === 'profile' && !document.activeElement.matches('input,textarea')) { var y = window.scrollY; render(); window.scrollTo(0, y); }
+      else if (state.tab === 'cart') cpRefresh();
+    } catch(e){}
+  }
+  async function pfPrefs(avatar, addrs){
+    var r; try { r = await sb.rpc('c_prefs', { p_token: state.token, p_avatar: avatar, p_addresses: addrs }); } catch(e){ r = null; }
+    var d = r && r.data;
+    if (!d || r.error) { toast('Saqlanmadi. SQL yangilanganmi? Internetni tekshiring'); return false; }
+    if (d.error === 'session') { clearSession(); render(); toast('Seans tugagan. Qayta kiring'); return false; }
+    if (d.error) { toast(d.error); return false; }
+    state.me = d.profile; save('qs_me', state.me); return true;
+  }
+  async function pfAction(a, t){
+    var k = a.split(':')[0], v = a.slice(k.length + 1), y = window.scrollY;
+    if (k === 'acc') { state.acc = state.acc === v ? '' : v; render(); var el = $('acc_' + v); if (el && state.acc) el.scrollIntoView({ block: 'start' }); else window.scrollTo(0, y); }
+    else if (k === 'avtoggle') { state.pickAv = !state.pickAv; render(); }
+    else if (k === 'av') { if (await pfPrefs(v, null)) { state.pickAv = false; render(); toast('Avatar o\'zgardi'); } }
+    else if (k === 'fav') { state.cat = '__fav'; state.tab = 'home'; render(); }
+    else if (k === 'share') { var l = refLink(); if (navigator.share) { try { await navigator.share({ title: 'qatti.SHOP', text: 'qatti.SHOP — Xitoy tovarlari arzon narxda!', url: l }); } catch(e){} } else { try { await navigator.clipboard.writeText(l); toast('Havola nusxalandi'); } catch(e){ toast('Havolani qo\'lda belgilang'); } } }
+    else if (k === 'lbl') { state.adLbl = v; ['Uy', 'Ish', 'Boshqa'].forEach(function(n){ var b = $('lb_' + n); if (b) b.classList.toggle('on', n === v); }); }
+    else if (k === 'addradd') {
+      var tx = $('ad_text').value.trim(); if (tx.length < 5) { toast('Manzilni to\'liqroq yozing'); return; }
+      var l2 = addrList().concat([{ label: state.adLbl || 'Uy', text: tx }]);
+      if (await pfPrefs(null, l2)) { render(); window.scrollTo(0, y); toast('Manzil qo\'shildi'); }
+    }
+    else if (k === 'addrdel') { var l3 = addrList().filter(function(x, i){ return i !== +v; }); if (await pfPrefs(null, l3)) { render(); window.scrollTo(0, y); } }
+    else if (k === 'addrmain') { var l4 = addrList().slice(), it = l4.splice(+v, 1)[0]; l4.unshift(it); if (await pfPrefs(null, l4)) { render(); window.scrollTo(0, y); toast('Asosiy manzil o\'zgardi'); } }
+    else if (k === 'useaddr') { var ad = addrList()[+v]; if (ad && $('f_addr')) $('f_addr').value = ad.text; }
+    else if (k === 'delacc') {
+      var pin = prompt('Hisobni o\'chirish — ortga qaytarib bo\'lmaydi. Ball va ma\'lumotlaringiz yo\'qoladi.\nTasdiqlash uchun PIN kiriting:'); if (pin === null) return;
+      var r; try { r = await sb.rpc('c_delete', { p_token: state.token, p_pin: pin.trim() }); } catch(e){ r = null; }
+      var d = r && r.data; if (!d || r.error) { toast('Xatolik. SQL yangilanganmi? Internetni tekshiring'); return; }
+      if (d.error && d.error !== 'session') { toast(d.error); return; }
+      clearSession(); state.loy = null; state.pmode = 'login'; render(); toast('Hisob o\'chirildi');
+    }
   }
   function renderInfo(){
     var steps = state.info.steps || [];
@@ -871,38 +1014,41 @@ html[data-theme=light] .btn.ghost{color:var(--text)}
     });
     var res;
     try {
-      res = await sb.rpc('place_order', { p_name: name, p_phone: phone, p_address: addr, p_note: note,
-        p_items: state.cart.map(function(i){ return { id: i.id, qty: i.qty, group: i.group, opt: i.opt || '' }; }), p_token: state.token, p_receipt: state.rcpt ? state.rcpt.full : null, p_thumb: state.rcpt ? state.rcpt.thumb : null, p_coupon: state.coupon ? state.coupon.code : null });
+      res = await sb.rpc('place_order', Object.assign({ p_name: name, p_phone: phone, p_address: addr, p_note: note,
+        p_items: state.cart.map(function(i){ return { id: i.id, qty: i.qty, group: i.group, opt: i.opt || '' }; }), p_token: state.token, p_receipt: state.rcpt ? state.rcpt.full : null, p_thumb: state.rcpt ? state.rcpt.thumb : null, p_coupon: state.coupon ? state.coupon.code : null }, bonusUse(couponNet(total)) > 0 ? { p_bonus: bonusUse(couponNet(total)) } : {}));
     } catch(e){ res = { error: { message: 'Tarmoq xatosi' } }; }
     if (res.error && /tizimga kiring/.test(res.error.message || '')) { clearSession(); state.tab = 'profile'; render(); toast('Seans tugagan. Qayta kiring'); return; }
     if (res.error && /romokod|kupon/i.test(res.error.message || '')) { state.coupon = null; cpRefresh(); btn.disabled = false; btn.textContent = 'Buyurtma yuborish'; toast(res.error.message); return; }
     if (res.error) { btn.disabled = false; btn.textContent = 'Buyurtma yuborish'; toast('Xatolik: ' + (res.error.message || 'qayta urinib ko\'ring')); return; }
-    var no = res.data, cdisc = couponDisc(state.coupon, total), ccode = cdisc ? state.coupon.code : '';
-    state.coupon = null;
-    state.orders.push({ no: no, date: new Date().toLocaleString('ru'), items: items, total: total - cdisc, discount: cdisc, coupon: ccode, phone: phone, server: true, thumb: state.rcpt ? state.rcpt.thumb : '', paid: false }); state.rcpt = null; save('qs_orders', state.orders);
+    var no = res.data, cdisc = couponDisc(state.coupon, total), ccode = cdisc ? state.coupon.code : '', bnu = bonusUse(total - cdisc);
+    state.coupon = null; state.useBonus = false;
+    state.orders.push({ no: no, date: new Date().toLocaleString('ru'), items: items, total: total - cdisc - bnu, discount: cdisc, bonus: bnu, coupon: ccode, phone: phone, server: true, thumb: state.rcpt ? state.rcpt.thumb : '', paid: false }); state.rcpt = null; save('qs_orders', state.orders);
     state.cart = []; save('qs_cart', state.cart);
     var msg = '🛍 Buyurtma #' + no + '\n' + items.map(function(i){ return '• ' + i.name + ' × ' + i.qty + (i.group ? ' (guruh)' : ''); }).join('\n') +
-      (cdisc ? '\n🎟 Kupon ' + ccode + ': −' + money(cdisc) : '') + '\nJami: ' + money(total - cdisc) + '\n👤 ' + name + '\n📞 ' + phone;
+      (cdisc ? '\n🎟 Kupon ' + ccode + ': −' + money(cdisc) : '') + (bnu ? '\n🎁 Ball: −' + money(bnu) : '') + '\nJami: ' + money(total - cdisc - bnu) + '\n👤 ' + name + '\n📞 ' + phone;
     var tg = tgName();
     $('sheet').innerHTML = '<button class="close" id="x">✕</button><div class="ok"><b>✅</b><div style="font-size:18px;font-weight:800">Buyurtma #' + esc(no) + ' qabul qilindi</div>' +
       '<p class="hint">Tez orada siz bilan bog\'lanamiz.' + (tg ? ' Tezroq javob olish uchun Telegramda ham yozishingiz mumkin.' : '') + '</p></div>' +
       '<div class="body">' + (tg ? '<a class="btn" target="_blank" rel="noopener" href="https://t.me/' + encodeURIComponent(tg) + '?text=' + encodeURIComponent(msg) + '">Telegramda yozish</a>' : '') +
       '<button class="btn ghost" style="margin-top:10px" id="x2">Yopish</button></div>';
     $('bg').classList.add('show'); $('sheet').classList.add('show');
+    loadLoy();
     state.tab = 'orders'; render();
     loadData().then(function(){ if (state.tab === 'home') render(); });
   }
 
+  document.addEventListener('change', function(e){ if (e.target && e.target.id === 'bn_use') { state.useBonus = !!e.target.checked; cpRefresh(); } });
   document.addEventListener('click', function(e){
-    var t = e.target.closest('[data-tab],[data-pm],#p_login,#p_reg,#p_save,#p_pin,#p_logout,[data-cat],[data-open],[data-zoom],#lbx,[data-opt],[data-addg],[data-adds],[data-share],[data-inc],[data-dec],#send,#cp_apply,[data-cprm],#x,#x2,#bg');
+    var t = e.target.closest('[data-pf],[data-tab],[data-pm],#p_login,#p_reg,#p_save,#p_pin,#p_logout,[data-cat],[data-open],[data-zoom],#lbx,[data-opt],[data-addg],[data-adds],[data-share],[data-inc],[data-dec],#send,#cp_apply,[data-cprm],#x,#x2,#bg');
     if (!t) return;
-    if (t.dataset.pm) { state.pmode = t.dataset.pm; render(); }
+    if (t.dataset.pf) pfAction(t.dataset.pf, t);
+    else if (t.dataset.pm) { state.pmode = t.dataset.pm; render(); }
     else if (t.id === 'p_login') doLogin();
     else if (t.id === 'p_reg') doRegister();
     else if (t.id === 'p_save') saveProfile();
     else if (t.id === 'p_pin') changePin();
     else if (t.id === 'p_logout') doLogout();
-    else if (t.dataset.tab) { state.next = t.dataset.next || ''; state.tab = t.dataset.tab; render(); if (state.tab === 'orders') refreshStatuses(); }
+    else if (t.dataset.tab) { state.next = t.dataset.next || ''; state.tab = t.dataset.tab; render(); if (state.tab === 'orders') refreshStatuses(); if (state.tab === 'profile' || state.tab === 'cart') loadLoy(); }
     else if (t.dataset.cat !== undefined) { state.cat = t.dataset.cat; render(); }
     else if (t.dataset.open) openProduct(+t.dataset.open);
     else if (t.id === 'lbx') closeZoom();
@@ -1298,7 +1444,8 @@ html[data-theme=light] .btn.ghost{color:var(--text)}
 
   async function init(){
     state.cart = load('qs_cart', []); state.orders = load('qs_orders', []); state.statuses = load('qs_status', {}); state.ship = load('qs_ship', {});
-    state.token = load('qs_token', ''); state.me = state.token ? load('qs_me', null) : null; state.pmode = 'login';
+    state.token = load('qs_token', ''); state.me = state.token ? load('qs_me', null) : null; state.loy = state.token ? load('qs_loy', null) : null;
+    try { var rq = new URLSearchParams(location.search).get('ref'); if (rq && /^[A-Za-z0-9]{4,12}$/.test(rq)) { save('qs_ref', rq.toUpperCase()); if (!state.token) state.pmode = 'reg'; try { history.replaceState(null, '', location.pathname); } catch(e2){} } } catch(e){} state.pmode = state.pmode || 'login';
     var ok = await loadData();
     if (!ok) { $('main').innerHTML = '<div class="empty"><b>📡</b>Mahsulotlar yuklanmadi.<br>Internetni tekshirib, qayta urinib ko\'ring.</div>'; renderNav(); }
     else {

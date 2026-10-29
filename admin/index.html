@@ -221,7 +221,7 @@ html[data-theme=light] .ohead .ch,html[data-theme=light] .oth{border-color:var(-
   }
   function render(){
     var v = S.tab === 'orders' ? viewOrders() : S.tab === 'products' ? viewProducts() : S.tab === 'customers' ? viewCustomers() : S.tab === 'texts' ? viewTexts() : viewStats();
-    $('view').innerHTML = v; renderNav();
+    $('view').innerHTML = v; renderNav(); stateSave();
   }
 
   /* ---------- Buyurtmalar ---------- */
@@ -422,7 +422,49 @@ html[data-theme=light] .ohead .ch,html[data-theme=light] .oth{border-color:var(-
     return thumb(p) + '<div style="flex:1"><button class="btn small ghost" data-pickimg="1">📷 Rasm yuklash</button> ' +
       (p.image_url ? '<button class="btn small danger" data-rmimg="1">Olib tashlash</button>' : '') + '<div class="muted" id="pf_up" style="margin-top:6px"></div></div>';
   }
-  function closeModal(){ $('modal').classList.remove('show'); S.editing = null; }
+  function closeModal(){ $('modal').classList.remove('show'); S.editing = null; draftClear(); }
+
+  /* ---------- Qoralama: boshqa ilovaga o'tib qaytganda ham joyida qoladi ---------- */
+  var DKEY = 'qa_draft', SKEY = 'qa_state';
+  var PF = ['pf_name', 'pf_cat', 'pf_opts', 'pf_desc', 'cc_yuan', 'cc_rate', 'cc_mk', 'cc_ship', 'pf_price', 'pf_old', 'pf_gs', 'pf_joined', 'pf_hours', 'pf_sort', 'pf_emoji'];
+  function draftSave(){
+    try {
+      var p = S.editing; if (!p || !$('modal') || !$('modal').classList.contains('show') || !$('pf_name')) return;
+      var v = {}; PF.forEach(function(id){ var e = $(id); if (e) v[id] = e.value; });
+      var a = $('pf_active'); if (a) v.pf_active = a.checked;
+      localStorage.setItem(DKEY, JSON.stringify({ t: Date.now(), id: p.id || 'new', v: v, images: p.images || [], image_url: p.image_url || '', ends_at: p.ends_at || null, hl0: p._hl0, scroll: $('modal').scrollTop }));
+    } catch(e){}
+  }
+  function draftClear(){ try { localStorage.removeItem(DKEY); } catch(e){} }
+  function draftRestore(){
+    try {
+      var d = JSON.parse(localStorage.getItem(DKEY) || 'null'); if (!d || Date.now() - d.t > 864e5) { draftClear(); return false; }
+      if (d.id !== 'new' && !S.products.some(function(x){ return String(x.id) === String(d.id); })) { draftClear(); return false; }
+      openEdit(d.id);
+      var p = S.editing; p.images = d.images || []; p.image_url = d.image_url || ''; p.ends_at = d.ends_at || null; p._hl0 = d.hl0;
+      Object.keys(d.v || {}).forEach(function(id){ var e = $(id); if (!e) return; if (id === 'pf_active') e.checked = !!d.v[id]; else e.value = d.v[id]; });
+      $('pf_pic').innerHTML = picBlock(p); $('pf_gal').innerHTML = galBlock(p);
+      $('modal').scrollTop = d.scroll || 0; toast('Qoralama tiklandi — davom eting');
+      return true;
+    } catch(e){ return false; }
+  }
+  var SAVED0 = null; try { SAVED0 = JSON.parse(localStorage.getItem('qa_state') || 'null'); } catch(e){}   // sahifa ochilgan zahoti o'qiladi (render() ustidan yozib yubormasligi uchun)
+  var NOSAVE = true;
+  function stateSave(){
+    if (NOSAVE) return;
+    try { localStorage.setItem(SKEY, JSON.stringify({ tab: S.tab, sub: S.sub, filter: S.filter, chat: S.chatOpen || null, y: Math.round(window.scrollY || 0) })); } catch(e){}
+  }
+  function stateRestore(){
+    try {
+      var st = SAVED0; NOSAVE = false; if (!st) return;
+      if (['orders', 'products', 'customers', 'texts', 'stats'].indexOf(st.tab) >= 0) S.tab = st.tab;
+      if (S.tab === 'texts' && st.sub && SUBS.some(function(x){ return x[0] === st.sub; })) S.sub = st.sub;
+      if (st.filter) S.filter = st.filter;
+      render(); if (st.y) setTimeout(function(){ window.scrollTo(0, st.y); }, 60);
+      if (S.tab === 'texts' && S.sub === 'chat') { loadChatThreads().then(function(){ if (st.chat) chatOpen(st.chat); else chatRender(); renderNav(); }); }
+      else if (S.sub === 'notify') loadAnns().then(notifyRender); else if (S.sub === 'reviews') loadRevs().then(rvRender);
+    } catch(e){}
+  }
 
   function compress(file, maxSide, quality){
     return new Promise(function(resolve, reject){
@@ -942,7 +984,7 @@ html[data-theme=light] .ohead .ch,html[data-theme=light] .oth{border-color:var(-
     return '';
   }
   function viewTexts(){
-    var ver = '<div class="muted" style="text-align:center;margin:22px 0 8px;font-size:12px">Admin ilova versiyasi: 2026.10.28-n (oq/qora fon)</div>';
+    var ver = '<div class="muted" style="text-align:center;margin:22px 0 8px;font-size:12px">Admin ilova versiyasi: 2026.10.29-o (joyida qolish)</div>';
     if (!S.sub) {
       return '<h2 style="margin-top:4px">Sozlamalar</h2>' + SUBS.map(function(x){
         return '<div class="card mn" data-sub="' + x[0] + '"><span class="ic">' + x[1] + '</span><div class="t"><b>' + x[2] + '</b><span class="muted">' + subStatus(x[0]) + '</span></div><span class="go">›</span></div>';
@@ -1217,12 +1259,15 @@ html[data-theme=light] .ohead .ch,html[data-theme=light] .oth{border-color:var(-
     refreshTab('orders');
   }, 60000);
 
+  setInterval(draftSave, 1500);
+  document.addEventListener('visibilitychange', function(){ if (document.hidden) { draftSave(); stateSave(); } });
+  window.addEventListener('pagehide', function(){ draftSave(); stateSave(); });
   async function boot(){
     if (!sb) { $('app').innerHTML = '<div class="empty"><b>⚠️</b>Ulanish sozlanmagan (config.js).</div>'; return; }
     try {
       var r = await sb.auth.getSession();
-      if (r.data && r.data.session) await enter(); else showLogin('');
-    } catch(e){ showLogin(''); }
+      if (r.data && r.data.session) { await enter(); stateRestore(); NOSAVE = false; draftRestore(); } else { NOSAVE = false; showLogin(''); }
+    } catch(e){ NOSAVE = false; showLogin(''); }
     if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(function(){});
   }
   boot();

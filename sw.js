@@ -35,7 +35,7 @@ self.addEventListener('push', e => {
   let d = {};
   try { d = e.data ? e.data.json() : {}; } catch (_) { d = { body: e.data ? e.data.text() : '' }; }
   e.waitUntil(self.registration.showNotification(d.title || 'qatti.SHOP', {
-    body: d.body || '', icon: 'icon-192.png', badge: 'badge-96.png', vibrate: [200, 100, 200, 100, 200], renotify: true, requireInteraction: false, silent: false, data: { url: d.url || './' }
+    body: d.body || '', icon: 'icon-192.png', badge: 'badge-96.png', vibrate: [200, 100, 200, 100, 200], tag: 'q' + Date.now(), renotify: true, requireInteraction: false, silent: false, data: { url: d.url || './' }
   }));
 });
 self.addEventListener('notificationclick', e => {

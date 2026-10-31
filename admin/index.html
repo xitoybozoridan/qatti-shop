@@ -185,10 +185,20 @@ html[data-theme=light] .ohead .ch,html[data-theme=light] .oth{border-color:var(-
     } catch(e){ toast('Yoqib bo\'lmadi: ' + (e.message || '')); }
     render();
   }
+  async function pushLocalTest(){
+    var info = 'Ruxsat: ' + (window.Notification ? Notification.permission : 'yoq');
+    try {
+      var reg = await navigator.serviceWorker.ready, sub = await reg.pushManager.getSubscription();
+      info += '\nObuna: ' + (sub ? 'bor' : 'yoq') + '\nSW: ' + (reg.active ? 'faol' : 'yoq');
+      await reg.showNotification('🔔 Sinov', { body: 'Telefon ichidagi sinov xabari', icon: 'icon-192.png', badge: 'badge-96.png', vibrate: [200, 100, 200], tag: 't' + Date.now() });
+      info += '\nXabar yuborildi: tepaga qarang';
+    } catch(e){ info += '\nXATO: ' + (e && e.message || e); }
+    alert(info);
+  }
   function pushCard(){
     if (!pushOk()) return '';
     var on = false; try { on = localStorage.getItem('qa_push') === '1' && Notification.permission === 'granted'; } catch(e){}
-    return '<div class="card" style="cursor:default;display:flex;align-items:center;gap:10px"><span style="font-size:22px">🔔</span><div style="flex:1"><b>Xabarnoma</b><div class="muted" style="font-size:12px">' + (on ? 'Yoqilgan: yangi buyurtma va chat xabari telefoningizda chiqadi' : 'Yangi buyurtma va chat xabari telefoningizning tepasida chiqsin') + '</div></div><button class="btn small ' + (on ? 'ghost' : '') + '" style="width:auto" data-admpush="1">' + (on ? 'O\'chirish' : 'Yoqish') + '</button></div>';
+    return '<div class="card" style="cursor:default;display:flex;align-items:center;gap:10px"><span style="font-size:22px">🔔</span><div style="flex:1"><b>Xabarnoma</b><div class="muted" style="font-size:12px">' + (on ? 'Yoqilgan: yangi buyurtma va chat xabari telefoningizda chiqadi' : 'Yangi buyurtma va chat xabari telefoningizning tepasida chiqsin') + '</div></div><button class="btn small ' + (on ? 'ghost' : '') + '" style="width:auto" data-admpush="1">' + (on ? 'O\'chirish' : 'Yoqish') + '</button></div><div class="card" style="cursor:default;display:flex;align-items:center;gap:10px"><span style="font-size:22px">🧪</span><div style="flex:1"><b>Xabarnoma sinovi</b><div class="muted" style="font-size:12px">Telefonning o\'zida sinab ko\'radi</div></div><button class="btn small ghost" style="width:auto" data-admpushtest="1">Sinash</button></div>';
   }
 
   async function enter(){
@@ -1022,7 +1032,7 @@ html[data-theme=light] .ohead .ch,html[data-theme=light] .oth{border-color:var(-
     return '';
   }
   function viewTexts(){
-    var ver = '<div class="muted" style="text-align:center;margin:22px 0 8px;font-size:12px">Admin ilova versiyasi: 2026.10.29-s (xabarnoma)</div>';
+    var ver = '<div class="muted" style="text-align:center;margin:22px 0 8px;font-size:12px">Admin ilova versiyasi: 2026.10.31-t (sinov)</div>';
     if (!S.sub) {
       return '<h2 style="margin-top:4px">Sozlamalar</h2>' + pushCard() + SUBS.map(function(x){
         return '<div class="card mn" data-sub="' + x[0] + '"><span class="ic">' + x[1] + '</span><div class="t"><b>' + x[2] + '</b><span class="muted">' + subStatus(x[0]) + '</span></div><span class="go">›</span></div>';
@@ -1241,7 +1251,7 @@ html[data-theme=light] .ohead .ch,html[data-theme=light] .oth{border-color:var(-
 
   /* ---------- Hodisalar ---------- */
   document.addEventListener('click', async function(e){
-    var t = e.target.closest('[data-admpush],[data-bonusadj],#theme,[data-oimg],[data-otog],[data-chopen],[data-chback],[data-chattach],[data-chmedel],#ch_send,[data-nfattach],[data-nfmedel],#nf_send,[data-nfdel],[data-rvsave],[data-rvhide],[data-rvdel],[data-sub],[id^=sv_],[data-cpdel],#cf_add,[data-adcopy],[data-adadd],[data-addel],[data-admv],#ad_save,[data-tab],[data-cust],[data-more],[data-gocust],[data-custedit],#ce_save,[data-rcp],[data-resetpin],[data-block],[data-filter],[data-edit],[data-closemodal],[data-pickimg],[data-pickgal],[data-rmgal],[data-rmimg],[data-delprod],[data-delorder],#l_go,#pf_save,[data-pickgal],[data-rmgal],#cc_use,#cc_save,#tx_save,#logout,#refresh');
+    var t = e.target.closest('[data-admpush],[data-admpushtest],[data-bonusadj],#theme,[data-oimg],[data-otog],[data-chopen],[data-chback],[data-chattach],[data-chmedel],#ch_send,[data-nfattach],[data-nfmedel],#nf_send,[data-nfdel],[data-rvsave],[data-rvhide],[data-rvdel],[data-sub],[id^=sv_],[data-cpdel],#cf_add,[data-adcopy],[data-adadd],[data-addel],[data-admv],#ad_save,[data-tab],[data-cust],[data-more],[data-gocust],[data-custedit],#ce_save,[data-rcp],[data-resetpin],[data-block],[data-filter],[data-edit],[data-closemodal],[data-pickimg],[data-pickgal],[data-rmgal],[data-rmimg],[data-delprod],[data-delorder],#l_go,#pf_save,[data-pickgal],[data-rmgal],#cc_use,#cc_save,#tx_save,#logout,#refresh');
     if (!t) return;
     if (t.id === 'l_go') return doLogin();
     if (t.id === 'logout') return logout();
@@ -1280,6 +1290,7 @@ html[data-theme=light] .ohead .ch,html[data-theme=light] .oth{border-color:var(-
     if (t.dataset.nfmedel) { S.nfMedia = null; notifyRender(); return; }
     if (t.id === 'nf_send') return nfSend();
     if (t.dataset.admpush) { pushToggle(); return; }
+    if (t.dataset.admpushtest) { pushLocalTest(); return; }
     if (t.dataset.nfdel) { if (!confirm('Xabar o\'chirilsinmi? Mijozlardan ham yo\'qoladi.')) return; var dr = await sb.from('announcements').delete().eq('id', +t.dataset.nfdel); if (dr.error) { toast('Xatolik: ' + errMsg(dr.error)); return; } await loadAnns(); notifyRender(); return; }
     if (t.dataset.rvsave || t.dataset.rvhide || t.dataset.rvdel) return rvAction(t);
     if (t.dataset.sub !== undefined) { S.sub = t.dataset.sub; S.chatOpen = null; if (S.sub === 'chat') { loadChatThreads().then(function(){ chatRender(); renderNav(); }); } if (S.sub === 'notify') loadAnns().then(notifyRender); if (S.sub === 'reviews') loadRevs().then(rvRender); render(); window.scrollTo(0, 0); return; }

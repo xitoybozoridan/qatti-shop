@@ -135,7 +135,8 @@ input[type=search]{-webkit-appearance:none;appearance:none}
 .gal::-webkit-scrollbar{display:none}
 .slide{flex:none;width:100%;height:100%;scroll-snap-align:center}
 .slide img{width:100%;height:100%;object-fit:contain}
-.lb{position:fixed;inset:0;background:#000;z-index:80;display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;touch-action:pan-x pinch-zoom}
+.lb{position:fixed;inset:0;background:#000;z-index:80;display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;touch-action:pan-x}
+.lb img{transform-origin:center center;will-change:transform;-webkit-user-drag:none;user-select:none}
 .lb::-webkit-scrollbar{display:none}
 .lb .s{flex:none;width:100%;height:100%;scroll-snap-align:center;display:grid;place-items:center}
 .lb img{max-width:100%;max-height:100%;object-fit:contain}
@@ -976,6 +977,51 @@ html[data-theme=light] .btn.ghost{color:var(--text)}
     document.body.appendChild(d); document.body.appendChild(x);
     if (dl) { var b = document.createElement('button'); b.className = 'lbd'; b.id = 'lbd'; b.textContent = '⬇ Yuklab olish'; document.body.appendChild(b); }
     d.scrollLeft = i * d.clientWidth;
+    lbZoomInit(d);
+  }
+  /* Rasm oynasida: ikki barmoq bilan kattalashtirish, surish, ikki marta bosish */
+  function lbZoomInit(lb){
+    var s = 1, tx = 0, ty = 0, img = null, q0 = { x: 0, y: 0 }, d0 = 1, s0 = 1, lastTap = 0, lastX = 0, lastY = 0;
+    function cur(){ var n = Math.round(lb.scrollLeft / lb.clientWidth), sl = lb.children[n]; img = sl ? sl.querySelector('img') : null; }
+    function O(){ var r = lb.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
+    function apply(){ if (img) img.style.transform = 'translate(' + tx + 'px,' + ty + 'px) scale(' + s + ')'; lb.style.touchAction = s > 1.01 ? 'none' : 'pan-x'; }
+    function clamp(){
+      if (!img) return;
+      var W = lb.clientWidth, H = lb.clientHeight, w = img.offsetWidth, h = img.offsetHeight;
+      var bx = Math.max(0, (w * s - W) / 2), by = Math.max(0, (h * s - H) / 2);
+      tx = Math.max(-bx, Math.min(bx, tx)); ty = Math.max(-by, Math.min(by, ty));
+    }
+    function mid(e){ var a = e.touches[0], b = e.touches[1] || a; return { x: (a.clientX + b.clientX) / 2, y: (a.clientY + b.clientY) / 2 }; }
+    function dist(e){ return e.touches.length < 2 ? 1 : Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY); }
+    function begin(e){ var m = mid(e), o = O(); q0 = { x: (m.x - o.x - tx) / s, y: (m.y - o.y - ty) / s }; d0 = dist(e); s0 = s; }
+    lb.addEventListener('touchstart', function(e){
+      if (!img || (e.touches.length === 1 && s <= 1.01)) cur();
+      if (!img) return;
+      if (e.touches.length === 1) {
+        var now = Date.now(), t = e.touches[0];
+        if (now - lastTap < 300 && Math.hypot(t.clientX - lastX, t.clientY - lastY) < 30) {
+          lastTap = 0;
+          if (s > 1.01) { s = 1; tx = 0; ty = 0; }
+          else { var m = mid(e), o = O(); s = 2.5; tx = -(m.x - o.x) * (s - 1); ty = -(m.y - o.y) * (s - 1); clamp(); }
+          apply(); e.preventDefault(); return;
+        }
+        lastTap = now; lastX = t.clientX; lastY = t.clientY;
+      }
+      begin(e);
+    }, { passive: false });
+    lb.addEventListener('touchmove', function(e){
+      if (!img) return;
+      var two = e.touches.length > 1;
+      if (!two && s <= 1.01) return;
+      var m = mid(e), o = O();
+      if (two) s = Math.max(1, Math.min(5, s0 * dist(e) / d0));
+      tx = m.x - o.x - s * q0.x; ty = m.y - o.y - s * q0.y; clamp(); apply(); e.preventDefault();
+    }, { passive: false });
+    lb.addEventListener('touchend', function(e){
+      if (!img) return;
+      if (s < 1.05) { s = 1; tx = 0; ty = 0; apply(); }
+      else if (e.touches.length > 0) begin(e);
+    });
   }
   async function downloadImg(url, name){
     try {

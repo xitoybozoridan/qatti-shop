@@ -140,6 +140,120 @@ if(seen){rm();return}
 setTimeout(function(){if(s)s.className="out"},1750);setTimeout(rm,2400);
 s.addEventListener("click",function(){if(s){s.className="out";setTimeout(rm,500)}});})();</script>
 </div>
+<!--qicons-start-->
+<style>
+.qi{display:inline-block;width:1.15em;height:1.15em;vertical-align:-.22em;color:inherit;line-height:1;flex:none}
+.qi svg{display:block;width:100%;height:100%;overflow:visible}
+.qi.fill svg{fill:currentColor}
+.qi.ok{color:#3ecf8e}.qi.bad{color:#ff5a5f}.qi.warn{color:#ffb020}.qi.heart{color:#ff4d6d}.qi.gold{color:#f3d77a}.qi.silver{color:#c9ccd3}.qi.bronze{color:#d98c4a}.qi.flame{color:#ffa43a}
+.empty b{display:block}
+.empty b .qi{width:58px;height:58px;color:var(--gold,#d4af37);filter:drop-shadow(0 0 14px rgba(212,175,55,.35))}
+.empty b .qi svg{stroke-width:1.4}
+nav button span .qi{width:23px;height:23px}
+.ldr{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:90px 20px;color:var(--muted,#9a978c);font-size:14px;letter-spacing:.4px}
+.ldr .ring{width:46px;height:46px;border-radius:50%;border:3px solid rgba(212,175,55,.18);border-top-color:var(--gold,#d4af37);border-right-color:var(--gold2,#f3d77a);animation:ldsp .8s linear infinite;box-shadow:0 0 22px rgba(212,175,55,.18)}
+@keyframes ldsp{to{transform:rotate(360deg)}}
+input[type=search]{padding-left:42px!important;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23d4af37' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.6-3.6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:14px center;background-size:18px}
+</style>
+<script>
+(function(){
+var P={
+home:'<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5"/>',
+cart:'<circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h3l2.7 12.4a1 1 0 0 0 1 .8h8.9a1 1 0 0 0 1-.8L20.5 7H6"/>',
+box:'<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5M12 13v8"/>',
+user:'<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/>',
+chat:'<path d="M21 12a8 8 0 0 1-11.6 7.1L3 21l1.9-5.4A8 8 0 1 1 21 12z"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01" stroke-width="2.6"/>',
+bell:'<path d="M6 16v-5a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 21a2 2 0 0 0 4 0"/>',
+belloff:'<path d="M6 16v-5a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 21a2 2 0 0 0 4 0M3 3l18 18"/>',
+moon:'<path d="M20 14.5A8.5 8.5 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5z"/>',
+sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+flame:'<path d="M12 22c4 0 7-2.8 7-7 0-3-1.8-5-3.2-6.6-.8-.9-1.3-2-1.3-3.4-2.4 1.2-4 3.4-4.3 5.6-.9-.5-1.6-1.4-1.9-2.6C6.4 9.5 5 12 5 15c0 4.2 3 7 7 7z"/>',
+search:'<circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/>',
+gift:'<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13M5 12v8a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-8"/><path d="M12 8c-1.5-3.5-5.5-4-5.5-1.7C6.5 8 9 8 12 8zM12 8c1.5-3.5 5.5-4 5.5-1.7C17.5 8 15 8 12 8z"/>',
+ticket:'<path d="M3 9V7a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v2a3 3 0 0 0 0 6v2a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-2a3 3 0 0 0 0-6z"/><path d="M14 6v12" stroke-dasharray="2 2.4"/>',
+checkc:'<circle cx="12" cy="12" r="9"/><path d="m8 12.5 2.8 2.8L16 9.5"/>',
+xc:'<circle cx="12" cy="12" r="9"/><path d="m9 9 6 6M15 9l-6 6"/>',
+signal:'<path d="M2 9a15 15 0 0 1 20 0M5.5 12.5a10 10 0 0 1 13 0M9 16a5 5 0 0 1 6 0"/><circle cx="12" cy="19.5" r=".9"/>',
+hourglass:'<path d="M6 3h12M6 21h12M7 3c0 5 3 6 5 9-2 3-5 4-5 9M17 3c0 5-3 6-5 9 2 3 5 4 5 9"/>',
+timer:'<circle cx="12" cy="13.5" r="7.5"/><path d="M12 9.5v4l2.5 1.5M9.5 2.5h5"/>',
+heart:'<path d="M12 20.5S3.5 15 3.5 9a4.5 4.5 0 0 1 8.5-2 4.5 4.5 0 0 1 8.5 2c0 6-8.5 11.5-8.5 11.5z"/>',
+bag:'<path d="M5 8h14l1 13H4z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/>',
+camera:'<path d="M4 8h3l1.7-2.5h6.6L17 8h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/>',
+pin:'<path d="M12 21.5s7-6.2 7-12a7 7 0 0 0-14 0c0 5.8 7 12 7 12z"/><circle cx="12" cy="9.5" r="2.5"/>',
+pencil:'<path d="M4 20l1-4L16.5 4.5a2.1 2.1 0 0 1 3 3L8 19z"/><path d="m14.5 6.5 3 3"/>',
+share:'<path d="M12 15V3M7.5 7.5 12 3l4.5 4.5"/><path d="M5 12v7a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-7"/>',
+phone:'<path d="M5 3h4l2 5-2.5 1.5a11 11 0 0 0 6 6L16 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 5a2 2 0 0 1 2-2z"/>',
+info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.8v.01"/>',
+download:'<path d="M12 3v12M7.5 10.5 12 15l4.5-4.5"/><path d="M5 20h14"/>',
+mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3.5 6.5 8.5 6.5 8.5-6.5"/>',
+star:'<path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>',
+sparkle:'<path d="M11 3l1.8 5.2L18 10l-5.2 1.8L11 17l-1.8-5.2L4 10l5.2-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>',
+card:'<rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 10h19M6 15h4"/>',
+zap:'<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>',
+gem:'<path d="M6 3h12l3.5 6L12 21 2.5 9z"/><path d="M2.5 9h19M9 3l-2 6 5 12 5-12-2-6"/>',
+rocket:'<path d="M14 4c3.5-.5 6-.5 6-.5s0 2.5-.5 6L14 15l-5-5z"/><path d="M9 10l-4 1-2 3 4 .5M14 15l-1 4-3 2-.5-4"/><circle cx="15.5" cy="8.5" r="1.3"/>',
+phones:'<path d="M4 15v-3a8 8 0 0 1 16 0v3"/><rect x="3" y="14" width="4" height="7" rx="1.5"/><rect x="17" y="14" width="4" height="7" rx="1.5"/>',
+medal:'<circle cx="12" cy="15" r="5.5"/><path d="M8.5 10.5 6 3h4l2 4 2-4h4l-2.5 7.5"/><path d="M12 12.5v5"/>',
+trophy:'<path d="M7 4h10v6a5 5 0 0 1-10 0z"/><path d="M7 6H4v2a3 3 0 0 0 3 3M17 6h3v2a3 3 0 0 1-3 3M12 15v4M8 21h8"/>',
+users:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><path d="M16 4.7a3.5 3.5 0 0 1 0 6.6M18.5 14.3c1.8.8 3 2.6 3 5.2"/>',
+link:'<path d="M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1 1"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1-1"/>',
+plane:'<path d="M21 3 3 10.5l7 2.5 2.5 7z"/><path d="m10 13 11-10"/>',
+lock:'<rect x="4.5" y="10.5" width="15" height="10.5" rx="2"/><path d="M8 10.5v-3a4 4 0 0 1 8 0v3"/>',
+trash:'<path d="M4 6.5h16M9.5 6.5V4h5v2.5M6 6.5 7 21h10l1-14.5M10 11v6M14 11v6"/>',
+hand:'<path d="M8 12V5.5a1.5 1.5 0 0 1 3 0V11M11 11V4a1.5 1.5 0 0 1 3 0v7M14 11V5.5a1.5 1.5 0 0 1 3 0V14c0 4-2.5 7-6.5 7-3 0-4.5-1.5-6-4L3 14.5a1.5 1.5 0 0 1 2.4-1.7L8 15"/>',
+alert:'<path d="M12 4v11M12 19.5v.01" stroke-width="2.6"/>',
+warn:'<path d="M12 3.5 22 20H2z"/><path d="M12 10v4.5M12 17.5v.01"/>',
+store:'<path d="M3.5 9 5 4h14l1.5 5"/><path d="M3.5 9a3 3 0 0 0 5.5 1.6 3 3 0 0 0 6 0A3 3 0 0 0 20.5 9"/><path d="M5 12.5V21h14v-8.5"/>',
+film:'<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 4v16M16 4v16M3 9h5M3 15h5M16 9h5M16 15h5"/>',
+eye:'<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+eyeoff:'<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path d="M3 3l18 18"/>',
+image:'<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="m21 16-5-5-8 9"/>',
+clip:'<path d="m20 11-8.5 8.5a5 5 0 0 1-7-7L13 4a3.3 3.3 0 0 1 4.7 4.7L9.5 17a1.7 1.7 0 0 1-2.4-2.4l7.5-7.5"/>',
+mega:'<path d="M3 10v4h4l8 4V6L7 10z"/><path d="M18.5 9a4 4 0 0 1 0 6"/>',
+ban:'<circle cx="12" cy="12" r="9"/><path d="m5.6 5.6 12.8 12.8"/>',
+flask:'<path d="M9.5 3h5M10.5 3v6L5 19a1.5 1.5 0 0 0 1.3 2h11.4a1.5 1.5 0 0 0 1.3-2L13.5 9V3"/><path d="M7.5 15h9"/>',
+gear:'<circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="7.5"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/>',
+chart:'<path d="M4 20V4M4 20h16"/><rect x="7.5" y="11" width="3" height="6" rx=".6"/><rect x="12.5" y="7" width="3" height="10" rx=".6"/><rect x="17.5" y="13" width="2.5" height="4" rx=".6"/>',
+receipt:'<path d="M5 3h14v18l-3-2-2 2-2-2-2 2-2-2-3 2z"/><path d="M9 8h6M9 12h6"/>',
+calc:'<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8.5 7h7M8.5 11.5h.01M12 11.5h.01M15.5 11.5h.01M8.5 15.5h.01M12 15.5h.01M15.5 15.5h.01" stroke-width="2.2"/>',
+alarm:'<circle cx="12" cy="13" r="7.5"/><path d="M12 9v4l2.5 1.5M4 5.5l2.5-2M20 5.5l-2.5-2"/>',
+plus:'<path d="M12 5v14M5 12h14"/>',
+clipb:'<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 11h6M9 15h4"/>',
+arrowup:'<path d="M12 20V5M6 11l6-6 6 6"/>',
+folder:'<path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H9l2 2.5h8.5A1.5 1.5 0 0 1 21 9v9.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z"/>',
+exch:'<path d="M4 8h14M14 4l4 4-4 4M20 16H6M10 12l-4 4 4 4"/>',
+key:'<circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M16 8l3 3M14 10l2 2"/>'
+};
+var M={'🏠':['home'],'🛒':['cart'],'📦':['box'],'👤':['user'],'💬':['chat'],'🔔':['bell'],'🔕':['belloff'],'🌙':['moon'],'☀':['sun'],'🔥':['flame','flame'],'🔍':['search'],'🔎':['search'],'🎁':['gift'],'🎟':['ticket'],'✅':['checkc','ok'],'❌':['xc','bad'],'📡':['signal'],'⏳':['hourglass'],'⌛':['hourglass'],'⏱':['timer'],'❤':['heart','heart fill'],'🤍':['heart'],'🛍':['bag'],'📷':['camera'],'📍':['pin'],'✏':['pencil'],'📤':['share'],'📞':['phone'],'ℹ':['info'],'⬇':['download'],'📮':['mail'],'📭':['mail'],'⭐':['star','gold fill'],'🎉':['sparkle','gold'],'✨':['sparkle','gold'],'💳':['card'],'⚡':['zap'],'💎':['gem'],'🚀':['rocket'],'🎧':['phones'],'🥇':['medal','gold'],'🥈':['medal','silver'],'🥉':['medal','bronze'],'🏆':['trophy','gold'],'👥':['users'],'🔗':['link'],'✈':['plane'],'🔐':['lock'],'🔑':['key'],'🗑':['trash'],'👋':['hand'],'❗':['alert','bad'],'⚠':['warn','warn'],'🏪':['store'],'🎬':['film'],'👁':['eye'],'🙈':['eyeoff'],'🖼':['image'],'📎':['clip'],'📣':['mega'],'📢':['mega'],'🚫':['ban','bad'],'⛔':['ban','bad'],'🧪':['flask'],'⚙':['gear'],'📊':['chart'],'🧾':['receipt'],'🧮':['calc'],'⏰':['alarm'],'➕':['plus'],'📋':['clipb'],'👆':['arrowup'],'🗂':['folder'],'💱':['exch']};
+var re1=new RegExp('('+Object.keys(M).join('|')+')️?','g'), re0=new RegExp('('+Object.keys(M).join('|')+')');
+var SKIP='.pic,.th,.thumb,.oth,.avpick,.keepe,script,style,textarea,select,option,title,svg,.qi';
+function mk(k){var d=M[k],s=document.createElement('span');s.className='qi'+(d[1]?' '+d[1]:'');s.setAttribute('data-e',k);s.setAttribute('aria-hidden','true');s.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+P[d[0]]+'</svg>';return s}
+function fix(t){
+  var p=t.parentNode; if(!p||p.nodeType!==1) return;
+  var s=t.nodeValue; if(!s||!re0.test(s)) return;
+  if(p.closest(SKIP)) return;
+  if(p.closest('.av')&&p.tagName!=='I') return;
+  var f=document.createDocumentFragment(),last=0,m; re1.lastIndex=0;
+  while((m=re1.exec(s))){ if(m.index>last) f.appendChild(document.createTextNode(s.slice(last,m.index))); f.appendChild(mk(m[1])); last=m.index+m[0].length; }
+  if(last<s.length) f.appendChild(document.createTextNode(s.slice(last)));
+  p.replaceChild(f,t);
+}
+function ph(el){ var v=el.getAttribute&&el.getAttribute('placeholder'); if(v){ var n=v.replace(/^[\u{1F300}-\u{1FAFF}☀-➿️\s]+/u,''); if(n!==v) el.setAttribute('placeholder',n); } }
+function walk(n){
+  if(n.nodeType===3){ fix(n); return; }
+  if(n.nodeType!==1) return;
+  if(n.closest&&n.closest(SKIP)) return;
+  ph(n); if(n.querySelectorAll) n.querySelectorAll('[placeholder]').forEach(ph);
+  var w=document.createTreeWalker(n,NodeFilter.SHOW_TEXT,null),a=[];
+  while(w.nextNode()) a.push(w.currentNode);
+  a.forEach(fix);
+}
+function start(){ walk(document.body); }
+new MutationObserver(function(ms){ for(var i=0;i<ms.length;i++){ var m=ms[i]; if(m.type==='characterData') fix(m.target); else m.addedNodes.forEach(walk); } }).observe(document.documentElement,{childList:true,subtree:true,characterData:true});
+if(document.body) start(); document.addEventListener('DOMContentLoaded',start);
+})();
+</script>
+<!--qicons-end-->
 <div id="app"></div>
 <div class="toast" id="toast"></div>
 <div class="modal" id="modal"></div>
@@ -234,7 +348,7 @@ s.addEventListener("click",function(){if(s){s.className="out";setTimeout(rm,500)
 
   async function enter(){
     if (!(await isAdmin())) { await sb.auth.signOut(); showLogin('Bu hisob admin sifatida qo\'shilmagan'); return; }
-    $('app').innerHTML = '<div class="empty"><b>⏳</b>Yuklanmoqda...</div>';
+    $('app').innerHTML = '<div class="ldr"><div class="ring"></div><span>Yuklanmoqda…</span></div>';
     await refreshAll();
     drawShell(); render(); pushSync();
   }
@@ -1063,7 +1177,7 @@ s.addEventListener("click",function(){if(s){s.className="out";setTimeout(rm,500)
     return '';
   }
   function viewTexts(){
-    var ver = '<div class="muted" style="text-align:center;margin:22px 0 8px;font-size:12px">Admin ilova versiyasi: 2026.11.02-v (ilova rejimi)</div>';
+    var ver = '<div class="muted" style="text-align:center;margin:22px 0 8px;font-size:12px">Admin ilova versiyasi: 2026.11.03-v (ilova rejimi)</div>';
     if (!S.sub) {
       return '<h2 style="margin-top:4px">Sozlamalar</h2>' + pushCard() + SUBS.map(function(x){
         return '<div class="card mn" data-sub="' + x[0] + '"><span class="ic">' + x[1] + '</span><div class="t"><b>' + x[2] + '</b><span class="muted">' + subStatus(x[0]) + '</span></div><span class="go">›</span></div>';

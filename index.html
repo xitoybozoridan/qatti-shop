@@ -232,6 +232,25 @@ html[data-theme=light] .btn.ghost{color:var(--text)}
 .addrrow .t{flex:1;min-width:0;font-size:14px;line-height:1.4}
 .addrrow button{background:none;border:1px solid var(--line);color:var(--muted);border-radius:8px;padding:4px 8px;font-size:12px;font-family:inherit}
 .cpn .btn{width:auto;flex:none}
+/* --- ilova hissi: o'tish, skelet, savat, oflayn --- */
+.pg{animation:pgIn .3s cubic-bezier(.2,.8,.2,1)}
+@keyframes pgIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+.sk{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:14px}
+.sk i{display:block;border-radius:16px;aspect-ratio:3/4;background:linear-gradient(100deg,var(--card) 30%,var(--card2) 50%,var(--card) 70%);background-size:300% 100%;animation:skm 1.2s linear infinite}
+.sk i:first-child{grid-column:1/-1;aspect-ratio:3/1}
+@keyframes skm{from{background-position:130% 0}to{background-position:-30% 0}}
+nav button.bump span{animation:bmp .5s cubic-bezier(.2,1.6,.4,1)}
+nav button.bump .dot{animation:bmpd .5s cubic-bezier(.2,1.8,.4,1)}
+@keyframes bmp{0%{transform:scale(1)}35%{transform:scale(1.45) rotate(-10deg)}70%{transform:scale(.92)}100%{transform:scale(1)}}
+@keyframes bmpd{0%{transform:scale(1)}40%{transform:scale(1.7)}100%{transform:scale(1)}}
+nav button:active span{transform:scale(.88)}
+#offl{position:fixed;inset:0;z-index:9990;background:var(--bg);display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px;gap:10px}
+#offl.on{display:flex;animation:pgIn .3s ease}
+#offl b{font-size:64px;line-height:1}
+#offl h3{margin:6px 0 0;font-size:20px;color:var(--text)}
+#offl p{margin:0;color:var(--muted);font-size:14px;max-width:260px}
+#offl button{margin-top:14px;padding:12px 26px;border-radius:14px;border:2px solid var(--gold);background:none;color:var(--gold2);font:700 15px inherit;font-family:inherit}
+@media (prefers-reduced-motion:reduce){.pg,.sk i,nav button.bump span,nav button.bump .dot{animation:none}}
 </style>
 </head>
 <body>
@@ -263,6 +282,7 @@ if(seen){rm();return}
 setTimeout(function(){if(s)s.className="out"},1750);setTimeout(rm,2400);
 s.addEventListener("click",function(){if(s){s.className="out";setTimeout(rm,500)}});})();</script>
 </div>
+<div id="offl"><b>📡</b><h3>Internet yo'q</h3><p>Aloqa tiklanishi bilan ilova o'zi davom etadi.</p><button id="offl_b">Qayta urinish</button><button id="offl_c" style="border-color:var(--line);color:var(--muted);margin-top:4px">Oflayn davom etish</button></div>
 <div id="app">
   <header>
     <div class="logo">qSH</div>
@@ -976,6 +996,7 @@ s.addEventListener("click",function(){if(s){s.className="out";setTimeout(rm,500)
     m.innerHTML = state.tab === 'home' ? renderHome() : state.tab === 'cart' ? renderCart() : state.tab === 'orders' ? renderOrders() : state.tab === 'profile' ? renderProfile() : renderHelp();
     renderNav();
     window.scrollTo(0, 0);
+    if (render._t !== state.tab) { render._t = state.tab; m.classList.remove('pg'); void m.offsetWidth; m.classList.add('pg'); }
     adStart(); adBind(); chatSync();
   }
 
@@ -1071,6 +1092,8 @@ s.addEventListener("click",function(){if(s){s.className="out";setTimeout(rm,500)
     var found = state.cart.filter(function(i){ return i.id === id && i.group === group && (i.opt || '') === opt; })[0];
     if (found) found.qty++; else state.cart.push({ id: id, group: group, qty: 1, opt: opt });
     save('qs_cart', state.cart); renderNav(); toast("Savatga qo'shildi");
+    try { var cb = document.querySelector('nav [data-tab=cart]'); if (cb) { cb.classList.remove('bump'); void cb.offsetWidth; cb.classList.add('bump'); } } catch(e){}
+    try { if (navigator.vibrate) navigator.vibrate([12, 40, 12]); } catch(e){}
   }
 
   function share(id){
@@ -1574,6 +1597,7 @@ s.addEventListener("click",function(){if(s){s.className="out";setTimeout(rm,500)
     state.cart = load('qs_cart', []); state.orders = load('qs_orders', []); state.statuses = load('qs_status', {}); state.ship = load('qs_ship', {});
     state.token = load('qs_token', ''); state.me = state.token ? load('qs_me', null) : null; state.loy = state.token ? load('qs_loy', null) : null;
     try { var rq = new URLSearchParams(location.search).get('ref'); if (rq && /^[A-Za-z0-9]{4,12}$/.test(rq)) { save('qs_ref', rq.toUpperCase()); if (!state.token) state.pmode = 'reg'; try { history.replaceState(null, '', location.pathname); } catch(e2){} } } catch(e){} state.pmode = state.pmode || 'login';
+    if (!(load('qs_cache', null))) $('main').innerHTML = '<div class="sk"><i></i><i></i><i></i><i></i><i></i></div>';
     var ok = await loadData();
     if (!ok) { $('main').innerHTML = '<div class="empty"><b>📡</b>Mahsulotlar yuklanmadi.<br>Internetni tekshirib, qayta urinib ko\'ring.</div>'; renderNav(); }
     else {
@@ -1589,6 +1613,27 @@ s.addEventListener("click",function(){if(s){s.className="out";setTimeout(rm,500)
     document.addEventListener('visibilitychange', function(){ if (!document.hidden) { refreshStatuses(); loadAnns(); loadStats(); chatUnreadPoll(); } if (!document.hidden && state.tab === 'home') loadData().then(function(){ if (state.tab === 'home') render(); }); });
     if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(function(){});
   }
+  /* haptic: tugmalar bosilganda yengil tebranish */
+  document.addEventListener('click', function(e){
+    try { if (navigator.vibrate && e.target.closest && e.target.closest('button,[data-tab],[data-open],.btn,.card')) navigator.vibrate(8); } catch(x){}
+  }, true);
+  /* oflayn ekrani */
+  (function(){
+    var o = $('offl'); if (!o) return;
+    function chk(){ if (navigator.onLine === false) o.classList.add('on'); }
+    window.addEventListener('offline', chk);
+    window.addEventListener('online', function(){
+      if (!o.classList.contains('on')) return;
+      o.classList.remove('on');
+      loadData().then(function(ok){ if (ok) render(); });
+    });
+    $('offl_b').addEventListener('click', function(){
+      if (navigator.onLine === false) { try { navigator.vibrate && navigator.vibrate(30); } catch(x){} toast('Internet hali yo\'q'); }
+      else { o.classList.remove('on'); loadData().then(function(ok){ if (ok) render(); }); }
+    });
+    $('offl_c').addEventListener('click', function(){ o.classList.remove('on'); });
+    chk();
+  })();
   init();
 })();
 </script>

@@ -86,7 +86,9 @@ a{color:var(--gold2)}
 .rcbig{position:fixed;inset:0;background:rgba(0,0,0,.94);z-index:80;display:grid;place-items:center;padding:10px;overflow:auto}.rcbig img{max-width:100%;max-height:100%;object-fit:contain}
 .kv{font-size:14px;margin-bottom:3px}.kv span{color:var(--muted)}
 button,a,select,input,label{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
-html,body{max-width:100%;overflow-x:hidden;touch-action:pan-x pan-y;overscroll-behavior-x:none;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+html,body{max-width:100%;overflow-x:hidden;touch-action:pan-x pan-y;overscroll-behavior-x:none;-webkit-text-size-adjust:100%;text-size-adjust:100%;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+input,textarea,select,[contenteditable]{-webkit-user-select:text;user-select:text}
+img{-webkit-user-drag:none;-webkit-touch-callout:none}
 
 /* ---- oq mavzu ---- */
 html[data-theme=light]{--bg:#f4f2ec;--card:#ffffff;--card2:#f0ede5;--line:#dedad0;--gold:#b8901a;--gold2:#8a6a0a;--text:#1b1a17;--muted:#6f6b60;--red:#e5383b;--green:#1f9d6a}
@@ -1033,7 +1035,7 @@ html[data-theme=light] .ohead .ch,html[data-theme=light] .oth{border-color:var(-
     return '';
   }
   function viewTexts(){
-    var ver = '<div class="muted" style="text-align:center;margin:22px 0 8px;font-size:12px">Admin ilova versiyasi: 2026.10.31-u (ilova rejimi)</div>';
+    var ver = '<div class="muted" style="text-align:center;margin:22px 0 8px;font-size:12px">Admin ilova versiyasi: 2026.11.01-v (ilova rejimi)</div>';
     if (!S.sub) {
       return '<h2 style="margin-top:4px">Sozlamalar</h2>' + pushCard() + SUBS.map(function(x){
         return '<div class="card mn" data-sub="' + x[0] + '"><span class="ic">' + x[1] + '</span><div class="t"><b>' + x[2] + '</b><span class="muted">' + subStatus(x[0]) + '</span></div><span class="go">›</span></div>';

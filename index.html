@@ -244,6 +244,9 @@ nav button.bump .dot{animation:bmpd .5s cubic-bezier(.2,1.8,.4,1)}
 @keyframes bmp{0%{transform:scale(1)}35%{transform:scale(1.45) rotate(-10deg)}70%{transform:scale(.92)}100%{transform:scale(1)}}
 @keyframes bmpd{0%{transform:scale(1)}40%{transform:scale(1.7)}100%{transform:scale(1)}}
 nav button:active span{transform:scale(.88)}
+#net{position:fixed;left:0;right:0;top:0;z-index:99990;padding:calc(env(safe-area-inset-top,0px) + 9px) 12px 9px;text-align:center;font:700 14px system-ui,-apple-system,Roboto,sans-serif;color:#fff;transform:translateY(-110%);transition:transform .35s cubic-bezier(.2,.9,.3,1);pointer-events:none}
+#net.off{background:#d9363e;transform:none}
+#net.on{background:#1f9d63;transform:none}
 #offl{position:fixed;inset:0;z-index:9990;background:var(--bg);display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px;gap:10px}
 #offl.on{display:flex;animation:pgIn .3s ease}
 #offl b{font-size:64px;line-height:1}
@@ -282,6 +285,7 @@ if(seen){rm();return}
 setTimeout(function(){if(s)s.className="out"},1750);setTimeout(rm,2400);
 s.addEventListener("click",function(){if(s){s.className="out";setTimeout(rm,500)}});})();</script>
 </div>
+<div id="net"></div>
 <div id="offl"><b>📡</b><h3>Internet yo'q</h3><p>Aloqa tiklanishi bilan ilova o'zi davom etadi.</p><button id="offl_b">Qayta urinish</button><button id="offl_c" style="border-color:var(--line);color:var(--muted);margin-top:4px">Oflayn davom etish</button></div>
 <div id="app">
   <header>
@@ -1617,22 +1621,22 @@ s.addEventListener("click",function(){if(s){s.className="out";setTimeout(rm,500)
   document.addEventListener('click', function(e){
     try { if (navigator.vibrate && e.target.closest && e.target.closest('button,[data-tab],[data-open],.btn,.card')) navigator.vibrate(8); } catch(x){}
   }, true);
-  /* oflayn ekrani */
+  /* internet holati: yuqorida xabar */
   (function(){
-    var o = $('offl'); if (!o) return;
-    function chk(){ if (navigator.onLine === false) o.classList.add('on'); }
-    window.addEventListener('offline', chk);
-    window.addEventListener('online', function(){
-      if (!o.classList.contains('on')) return;
-      o.classList.remove('on');
-      loadData().then(function(ok){ if (ok) render(); });
-    });
-    $('offl_b').addEventListener('click', function(){
-      if (navigator.onLine === false) { try { navigator.vibrate && navigator.vibrate(30); } catch(x){} toast('Internet hali yo\'q'); }
-      else { o.classList.remove('on'); loadData().then(function(ok){ if (ok) render(); }); }
-    });
-    $('offl_c').addEventListener('click', function(){ o.classList.remove('on'); });
-    chk();
+    var n = $('net'), o = $('offl'), last = navigator.onLine !== false, tm;
+    function show(on){
+      if (on === last) return; last = on;
+      clearTimeout(tm);
+      n.className = on ? 'on' : 'off';
+      n.textContent = on ? '✅ Internetga ulandingiz' : '📡 Internet yo\'q';
+      try { navigator.vibrate && navigator.vibrate(on ? [15, 40, 15] : 40); } catch(x){}
+      if (on) { tm = setTimeout(function(){ n.className = ''; }, 2600); loadData().then(function(ok){ if (ok) render(); }); }
+    }
+    function check(){ show(navigator.onLine !== false); }
+    window.addEventListener('offline', check); window.addEventListener('online', check);
+    setInterval(check, 2000);
+    if (last === false) { n.className = 'off'; n.textContent = '📡 Internet yo\'q'; }
+    if (o) { o.classList.remove('on'); }
   })();
   init();
 })();

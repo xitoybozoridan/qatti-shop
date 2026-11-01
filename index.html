@@ -1195,7 +1195,7 @@ s.addEventListener("click",function(){if(s){s.className="out";setTimeout(rm,500)
     var f = t.files[0];
     if (t.id === 'rc_file') {
       try { state.rcpt = await readReceipt(f); var bx = $('rcpt_box'); if (bx) bx.innerHTML = rcptBoxHtml(); toast('Chek yuklandi'); }
-      catch(err){ toast(err.message === 'format' ? 'Bu fayl rasm emas yoki formati mos emas. Chek skrinshotini (PNG yoki JPG) yuklang' : 'Chek yuklanmadi: ' + (err.message || '')); }
+      catch(err){ toast(err.message === 'format' ? 'Rasm ochilmadi (' + (f.type || 'turi nomalum') + ', ' + Math.round((f.size || 0) / 1024) + ' KB). Boshqa rasm tanlang yoki skrinshot oling' : 'Chek yuklanmadi: ' + (err.message || '')); }
       t.value = '';
     } else if (t.id === 'rc_late') { var no = state.attachNo; t.value = ''; if (no) lateReceipt(f, no); }
   });

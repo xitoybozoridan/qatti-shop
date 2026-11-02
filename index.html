@@ -232,6 +232,15 @@ html[data-theme=light] .btn.ghost{color:var(--text)}
 .addrrow .t{flex:1;min-width:0;font-size:14px;line-height:1.4}
 .addrrow button{background:none;border:1px solid var(--line);color:var(--muted);border-radius:8px;padding:4px 8px;font-size:12px;font-family:inherit}
 .cpn .btn{width:auto;flex:none}
+.geobtn{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;margin:-2px 0 6px;padding:11px 14px;border-radius:12px;border:1.5px dashed var(--gold);background:rgba(212,175,55,.07);color:var(--gold2);font:600 14px inherit;font-family:inherit}
+.geobtn .gi{display:inline-flex}
+.geobtn.busy{opacity:.8;pointer-events:none}
+.geobtn.busy .gi{animation:ldsp .9s linear infinite}
+.geoinfo{font-size:12.5px;color:var(--muted);margin:0 2px 10px;line-height:1.45}
+.geoinfo:empty{display:none}
+.geoinfo a{color:var(--gold2)}
+.geoinfo b{color:var(--text)}
+.geoinfo.err{color:var(--red)}
 /* --- ilova hissi: o'tish, skelet, savat, oflayn --- */
 .pg{animation:pgIn .3s cubic-bezier(.2,.8,.2,1)}
 @keyframes pgIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
@@ -769,6 +778,7 @@ if(document.body) start(); document.addEventListener('DOMContentLoaded',start);
       '<label>Ismingiz</label><input id="f_name" autocomplete="name" value="' + esc(u.name) + '">' +
       '<label>Telefon raqam</label><input id="f_phone" type="tel" autocomplete="tel" placeholder="+998" value="' + esc(u.phone) + '">' +
       '<label>Manzil (viloyat, shahar, ko\'cha)</label>' + addrChips() + '<input id="f_addr" autocomplete="street-address" value="' + esc(u.addr) + '">' +
+      '<button type="button" class="geobtn" data-pf="geo:f_addr"><span class="gi">📍</span><span class="gt">Joriy joylashuvimni aniqlash</span></button><div id="geo_f_addr" class="geoinfo"></div>' +
       '<label>Izoh (rang, o\'lcham...)</label><textarea id="f_note" rows="2"></textarea>' +
       payBoxHtml(payNet(total)) +
       '<button class="btn" id="send">Buyurtma yuborish</button>';
@@ -987,6 +997,70 @@ if(document.body) start(); document.addEventListener('DOMContentLoaded',start);
     return a.join(' · ');
   }
   function refLink(){ var code = state.me && state.me.ref_code; if (!code) return ''; return location.origin + location.pathname.replace(/index\.html$/, '') + '?ref=' + encodeURIComponent(code); }
+
+  /* ---------- Joriy joylashuv ---------- */
+  var CYR = {'а':'a','б':'b','в':'v','г':'g','д':'d','е':'e','ё':'yo','ж':'j','з':'z','и':'i','й':'y','к':'k','л':'l','м':'m','н':'n','о':'o','п':'p','р':'r','с':'s','т':'t','у':'u','ф':'f','х':'x','ц':'ts','ч':'ch','ш':'sh','щ':'sh','ъ':'ʼ','ы':'i','ь':'','э':'e','ю':'yu','я':'ya','ў':'oʻ','қ':'q','ғ':'gʻ','ҳ':'h'};
+  function lat(s){
+    s = String(s || ''); if (!/[Ѐ-ӿ]/.test(s)) return s;
+    return s.replace(/[Ѐ-ӿ]/g, function(c){ var l = c.toLowerCase(), r = CYR[l]; if (r == null) return c; return c === l ? r : r.charAt(0).toUpperCase() + r.slice(1); });
+  }
+  function geoAddrText(j){
+    var a = (j && j.address) || {}, parts = [];
+    function add(x){ x = lat(x); if (x && parts.indexOf(x) < 0) parts.push(x); }
+    add(a.state || a.region || a.province);
+    add(a.city || a.town || a.municipality || a.county);
+    add(a.city_district || a.district || a.suburb || a.borough);
+    add(a.village || a.hamlet || a.neighbourhood || a.quarter);
+    var st = lat(a.road || a.pedestrian || a.residential || a.footway || ''); if (st) add(a.house_number ? st + ' ' + a.house_number : st);
+    else if (a.house_number) add(a.house_number + '-uy');
+    if (!parts.length && j && j.display_name) return lat(j.display_name).split(',').slice(0, 5).join(',').trim();
+    return parts.join(', ');
+  }
+  function geoMsg(id, html, err){ var el = $('geo_' + id); if (el) { el.className = 'geoinfo' + (err ? ' err' : ''); el.innerHTML = html; } }
+  function geoPos(){
+    return new Promise(function(res, rej){
+      if (!navigator.geolocation) { rej({ code: 99 }); return; }
+      var best = null, done = false, wid;
+      function fin(){ if (done) return; done = true; try { navigator.geolocation.clearWatch(wid); } catch(e){} best ? res(best) : rej({ code: 3 }); }
+      wid = navigator.geolocation.watchPosition(function(p){
+        if (!best || p.coords.accuracy < best.coords.accuracy) best = p;
+        if (p.coords.accuracy <= 25) fin();
+      }, function(e){ if (!best) { done = true; try { navigator.geolocation.clearWatch(wid); } catch(x){} rej(e); } }, { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 });
+      setTimeout(fin, 9000);
+    });
+  }
+  async function geoFill(id, btn){
+    var inp = $(id); if (!inp) return;
+    var b = btn && btn.closest ? btn.closest('.geobtn') || btn : null, tx = b && b.querySelector('.gt'), old = tx ? tx.textContent : '';
+    if (b) { b.classList.add('busy'); if (tx) tx.textContent = 'Aniqlanmoqda...'; }
+    geoMsg(id, '', false);
+    function back(){ if (b) { b.classList.remove('busy'); if (tx) tx.textContent = old; } }
+    var pos;
+    try { pos = await geoPos(); }
+    catch(e){
+      back();
+      var c = e && e.code;
+      geoMsg(id, c === 1 ? "Joylashuvga ruxsat berilmadi. Telefon sozlamalarida ilova uchun «Joylashuv»ni yoqing yoki manzilni qo'lda yozing." :
+                 c === 99 ? "Bu qurilmada joylashuvni aniqlab bo'lmaydi. Manzilni qo'lda yozing." :
+                 "Joylashuvni aniqlab bo'lmadi. GPS yoqilganini tekshiring yoki manzilni qo'lda yozing.", true);
+      return;
+    }
+    var la = pos.coords.latitude, lo = pos.coords.longitude, acc = Math.round(pos.coords.accuracy || 0);
+    state.geo = { lat: +la.toFixed(6), lon: +lo.toFixed(6), acc: acc, id: id };
+    var text = '', ok = false;
+    try {
+      var ctl = new AbortController(); var tm = setTimeout(function(){ ctl.abort(); }, 8000);
+      var r = await fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=18&addressdetails=1&accept-language=uz,ru,en&lat=' + la + '&lon=' + lo, { signal: ctl.signal });
+      clearTimeout(tm);
+      if (r.ok) { text = geoAddrText(await r.json()); ok = !!text; }
+    } catch(e){}
+    back();
+    var link = 'https://maps.google.com/?q=' + state.geo.lat + ',' + state.geo.lon;
+    if (ok) { inp.value = text; try { inp.dispatchEvent(new Event('input', { bubbles: true })); } catch(e){} }
+    var accTxt = acc ? " (aniqlik ±" + acc + " m)" : '';
+    geoMsg(id, (ok ? "<b>Joylashuv aniqlandi</b>" + accTxt + ". Manzilni tekshirib, uy/xonadon raqamini qo'shing." : "<b>Koordinata olindi</b>" + accTxt + ". Manzil nomi topilmadi, uni qo'lda yozing.") + ' <a href="' + link + '" target="_blank" rel="noopener">Xaritada ko\'rish</a>', false);
+    try { if (navigator.vibrate) navigator.vibrate(20); } catch(e){}
+  }
   function addrList(){ var l = state.me && state.me.addresses; return Array.isArray(l) ? l : []; }
   function addrChips(){
     var l = addrList(); if (l.length < 2) return '';
@@ -1041,7 +1115,7 @@ if(document.body) start(); document.addEventListener('DOMContentLoaded',start);
       (al.length ? al.map(function(a, i){ return '<div class="addrrow"><div class="t"><b>' + esc(a.label) + '</b>' + (i === 0 ? ' <span class="tag" style="margin:0">asosiy</span>' : '') + '<br><span class="muted">' + esc(a.text) + '</span></div>' +
         (i > 0 ? '<button data-pf="addrmain:' + i + '">Asosiy</button>' : '') + '<button data-pf="addrdel:' + i + '" style="color:var(--red)">✕</button></div>'; }).join('') : '<div class="muted" style="margin-bottom:6px">Manzil qo\'shilmagan.</div>') +
       (al.length < 5 ? '<div style="margin-top:10px"><div class="chips" style="margin-bottom:6px"><button class="chip on" data-pf="lbl:Uy" id="lb_Uy">Uy</button><button class="chip" data-pf="lbl:Ish" id="lb_Ish">Ish</button><button class="chip" data-pf="lbl:Boshqa" id="lb_Boshqa">Boshqa</button></div>' +
-        '<input id="ad_text" placeholder="Viloyat, shahar, ko\'cha, uy" autocomplete="off"><button class="btn" id="ad_add" data-pf="addradd">Manzil qo\'shish</button></div>' : '<div class="muted" style="margin-top:8px">Ko\'pi bilan 5 ta manzil.</div>'));
+        '<input id="ad_text" placeholder="Viloyat, shahar, ko\'cha, uy" autocomplete="off"><button type="button" class="geobtn" data-pf="geo:ad_text"><span class="gi">📍</span><span class="gt">Joriy joylashuvimni aniqlash</span></button><div id="geo_ad_text" class="geoinfo"></div><button class="btn" id="ad_add" data-pf="addradd">Manzil qo\'shish</button></div>' : '<div class="muted" style="margin-top:8px">Ko\'pi bilan 5 ta manzil.</div>'));
     h += accHtml('me', '✏️', 'Ma\'lumotlarim', '',
       '<label>Ism Familiya</label><input id="a_name" autocomplete="name" value="' + esc(m.name) + '">' +
       '<div class="muted" style="margin:-4px 0 10px;font-size:12px">Telefon raqam hisobingizning kaliti. Uni o\'zgartirish uchun adminga so\'rov yuboring.</div>' +
@@ -1076,6 +1150,7 @@ if(document.body) start(); document.addEventListener('DOMContentLoaded',start);
   async function pfAction(a, t){
     if (a === 'pushon') { pushEnable(); return; } if (a === 'pushoff') { pushOff(); return; }
     var k = a.split(':')[0], v = a.slice(k.length + 1), y = window.scrollY;
+    if (k === 'geo') { geoFill(v, t); return; }
     if (k === 'acc') { state.acc = state.acc === v ? '' : v; render(); var el = $('acc_' + v); if (el && state.acc) el.scrollIntoView({ block: 'start' }); else window.scrollTo(0, y); }
     else if (k === 'avtoggle') { state.pickAv = !state.pickAv; render(); }
     else if (k === 'av') { if (await pfPrefs(v, null)) { state.pickAv = false; render(); toast('Avatar o\'zgardi'); } }
@@ -1089,7 +1164,7 @@ if(document.body) start(); document.addEventListener('DOMContentLoaded',start);
     }
     else if (k === 'addrdel') { var l3 = addrList().filter(function(x, i){ return i !== +v; }); if (await pfPrefs(null, l3)) { render(); window.scrollTo(0, y); } }
     else if (k === 'addrmain') { var l4 = addrList().slice(), it = l4.splice(+v, 1)[0]; l4.unshift(it); if (await pfPrefs(null, l4)) { render(); window.scrollTo(0, y); toast('Asosiy manzil o\'zgardi'); } }
-    else if (k === 'useaddr') { var ad = addrList()[+v]; if (ad && $('f_addr')) $('f_addr').value = ad.text; }
+    else if (k === 'useaddr') { var ad = addrList()[+v]; if (ad && $('f_addr')) { $('f_addr').value = ad.text; state.geo = null; geoMsg('f_addr', '', false); } }
     else if (k === 'delacc') {
       var pin = prompt('Hisobni o\'chirish — ortga qaytarib bo\'lmaydi. Ball va ma\'lumotlaringiz yo\'qoladi.\nTasdiqlash uchun PIN kiriting:'); if (pin === null) return;
       var r; try { r = await sb.rpc('c_delete', { p_token: state.token, p_pin: pin.trim() }); } catch(e){ r = null; }
@@ -1225,6 +1300,7 @@ if(document.body) start(); document.addEventListener('DOMContentLoaded',start);
 
   async function sendOrder(){
     var name = $('f_name').value.trim(), phone = $('f_phone').value.trim(), addr = $('f_addr').value.trim(), note = $('f_note').value.trim();
+    if (state.geo && state.geo.id === 'f_addr') note = (note ? note + '\n' : '') + '📍 Joylashuv: https://maps.google.com/?q=' + state.geo.lat + ',' + state.geo.lon + (state.geo.acc ? ' (±' + state.geo.acc + ' m)' : '');
     if (!name || phone.replace(/\D/g, '').length < 9 || !addr) { toast("Ism, telefon va manzilni to'ldiring"); return; }
     if (!sb) { toast("Internetga ulanib bo'lmadi. Keyinroq urinib ko'ring"); return; }
     if (payReq() && !state.rcpt) { toast("Avval to'lov chekini yuklang"); return; }

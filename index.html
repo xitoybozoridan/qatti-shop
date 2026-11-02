@@ -285,6 +285,116 @@ if(seen){rm();return}
 setTimeout(function(){if(s)s.className="out"},1750);setTimeout(rm,2400);
 s.addEventListener("click",function(){if(s){s.className="out";setTimeout(rm,500)}});})();</script>
 </div>
+<!--qlang-start-->
+<script>
+(function(){
+document.addEventListener('click',function(e){var b=e.target.closest&&e.target.closest('#lang');if(b){try{localStorage.setItem('qs_lang',document.documentElement.getAttribute('lang')==='ru'?'uz':'ru')}catch(x){}location.reload();}});
+var L='uz'; try{ L=localStorage.getItem('qs_lang')==='ru'?'ru':'uz'; }catch(e){}
+document.documentElement.setAttribute('lang',L);
+if(L!=='ru'){ window.__qsT=function(s){return s}; return; }
+/* ---- to'liq mos kelish ---- */
+var E={
+"Bosh sahifa":"Главная","Savat":"Корзина","Buyurtmalar":"Заказы","Profil":"Профиль","Yordam":"Помощь","Xabarlar":"Новости","Qora":"Тёмная","Oq":"Светлая",
+"Hammasi":"Все","Sevimlilar":"Избранное","Kirish":"Войти","Ro'yxatdan o'tish":"Регистрация","Kirish / Ro'yxatdan o'tish":"Вход / Регистрация",
+"Qayta urinish":"Повторить","Oflayn davom etish":"Продолжить офлайн","Internet yo'q":"Нет интернета","Yuklanmoqda…":"Загрузка…","Yuklanmoqda...":"Загрузка...",
+"Xitoy tovarlari, guruh bilan arzon":"Товары из Китая, в группе дешевле","Batafsil →":"Подробнее →","Guruhga qo'shilish":"Вступить в группу","Yakka olish":"Купить один",
+"Savatga qo'shish":"В корзину","Nusxalash":"Копировать","Telegramda yozing":"Напишите в Telegram","Telegramda yozish":"Написать в Telegram","Asosiy":"Основной",
+"Chat":"Чат","Ma'lumot":"Информация","Kuzatish":"Отследить","Ulashish":"Поделиться","Chek yuborish":"Отправить чек","Havolani nusxalash":"Скопировать ссылку",
+"Do'stlarga ulashish":"Поделиться с друзьями","Telegramda ulashish":"Поделиться в Telegram","Raqamni o'zgartirish so'rovi":"Запрос на смену номера",
+"O'chirish":"Удалить","Qayta":"Снова","Olib tashlash":"Убрать","Bonus ballar":"Бонусные баллы","Bugungi guruhlar":"Группы дня","Mahsulotlar":"Товары",
+"Mahsulot qidirish...":"Поиск товаров...","Hech narsa topilmadi.":"Ничего не найдено.","Hozircha mahsulot yo'q.":"Пока нет товаров.","Tez orada yangilari qo'shiladi.":"Скоро появятся новые.",
+"Savat bo'sh.":"Корзина пуста.","Bosh sahifadan mahsulot tanlang.":"Выберите товар на главной странице.","Hali buyurtma yo'q.":"Заказов пока нет.",
+"Buyurtma yuborish":"Оформить заказ","Buyurtma ma'lumotlari":"Данные заказа","Ism Familiya":"Имя Фамилия","Ismingiz":"Ваше имя","Telefon raqam":"Номер телефона","Telefon raqamim":"Мой номер",
+"Manzil (viloyat, shahar, ko'cha)":"Адрес (область, город, улица)","Manzil (viloyat, shahar, ko'cha) — ixtiyoriy":"Адрес (область, город, улица) — по желанию","Izoh (rang, o'lcham...)":"Комментарий (цвет, размер...)",
+"To'lov":"Оплата","To'lov chekini yuklash":"Загрузить чек об оплате","To'lov jami:":"Итого к оплате:","Jami":"Итого","Jami xarid":"Всего куплено","Guruh narxi":"Цена в группе","Yakka narx":"Цена в одиночку",
+"Chek yuklandi":"Чек загружен","Chek yuborildi":"Чек отправлен","Chek tekshirilmoqda":"Чек проверяется","To'lov qabul qilindi":"Оплата принята","Yuborilmadi":"Не отправлено",
+"Qabul qilindi":"Принят","Tasdiqlandi":"Подтверждён","Xitoydan sotib olindi":"Куплен в Китае","Yo'lda":"В пути","Keldi — olib ketishingiz mumkin":"Прибыл — можно забирать","Yakunlandi":"Завершён","Bekor qilindi":"Отменён",
+"Guruh to'ldi!":"Группа собрана!","Telefon va PIN ni kiriting":"Введите телефон и PIN","Avval hisobga kiring":"Сначала войдите в аккаунт","Avval tizimga kiring":"Сначала войдите в систему",
+"Avval to'lov chekini yuklang":"Сначала загрузите чек об оплате","Avval yulduzchani tanlang":"Сначала выберите звёзды","Buyurtma berish uchun kiring":"Войдите, чтобы оформить заказ","Chat uchun avval kiring":"Войдите, чтобы писать в чат",
+"Savatga qo'shildi":"Добавлено в корзину","Havola nusxalandi":"Ссылка скопирована","Nusxalandi":"Скопировано","Saqlandi":"Сохранено","Saqlash":"Сохранить","Yopish":"Закрыть","Yoqish":"Включить","Yangilash":"Обновить","Yuborish":"Отправить",
+"Xatolik":"Ошибка","Tarmoq xatosi":"Ошибка сети","Ruxsat berilmadi":"Доступ не разрешён","Rasm juda katta":"Изображение слишком большое","Rasm ochilmadi yoki juda katta":"Изображение не открылось или слишком большое",
+"Rasm yuklab olindi":"Изображение скачано","Rasmlar yuklab olindi":"Изображения скачаны","Hozircha xabar yo'q":"Пока нет сообщений","Bildirishnomalar":"Уведомления","Xabarnomalarni yoqing":"Включите уведомления",
+"Xabarnomalar yoqildi":"Уведомления включены","Xabarnomalar yoqilgan":"Уведомления включены","Xabarnomalar o'chirildi":"Уведомления отключены","Xabarnomalar bloklangan. Yoqish uchun telefon sozlamalaridan ilova xabarnomalariga ruxsat bering.":"Уведомления заблокированы. Чтобы включить, разрешите их для приложения в настройках телефона.",
+"Buyurtma holati va admin javobi telefoningizning tepasida chiqadi.":"Статус заказа и ответ администратора появятся в верхней части экрана телефона.",
+"Ma'lumotlarim":"Мои данные","Buyurtmalarim":"Мои заказы","Kuponlarim":"Мои купоны","Manzillarim":"Мои адреса","Kupon":"Купон","Ball":"Баллы","Buyurtma":"Заказов","Xavfsizlik":"Безопасность","Hisobdan chiqish":"Выйти из аккаунта","Hisobni o'chirish":"Удалить аккаунт",
+"Hisob o'chirildi":"Аккаунт удалён","Hisobdan chiqasizmi?":"Выйти из аккаунта?","PIN":"PIN","PIN ni o'zgartirish":"Изменить PIN","PIN ni takrorlang":"Повторите PIN","PIN o'zgartirildi":"PIN изменён","PIN lar bir xil emas":"PIN-коды не совпадают","PIN esdan chiqdimi?":"Забыли PIN?","Eski PIN":"Старый PIN","Yangi PIN (4–6 ta raqam)":"Новый PIN (4–6 цифр)","PIN (4–6 ta raqam)":"PIN (4–6 цифр)",
+"PIN 4–6 ta raqamdan iborat bo'lsin":"PIN должен состоять из 4–6 цифр","PIN ni eslab qoling: u bilan hisobingizga kirasiz.":"Запомните PIN: с ним вы входите в аккаунт.","Eski PIN va yangi PIN (4–6 raqam) ni kiriting":"Введите старый и новый PIN (4–6 цифр)",
+"Admin bilan bog'laning, yangi PIN beradi.":"Свяжитесь с администратором — он выдаст новый PIN.","Ismingizni kiriting":"Введите имя","Telefon raqamni to'g'ri kiriting":"Введите номер телефона правильно","Ism, telefon va manzilni to'ldiring":"Заполните имя, телефон и адрес",
+"Manzil qo'shish":"Добавить адрес","Manzil qo'shildi":"Адрес добавлен","Manzil qo'shilmagan.":"Адресов нет.","Manzilni to'liqroq yozing":"Укажите адрес подробнее","Asosiy manzil o'zgardi":"Основной адрес изменён","Ko'pi bilan 5 ta manzil.":"Не более 5 адресов.",
+"Avatar o'zgardi":"Аватар изменён","Harf":"Буква","Do'stni taklif qilish":"Пригласить друга","Sizning kodingiz":"Ваш код","Promokod qabul qilindi":"Промокод принят","Promokodni yozing":"Введите промокод","Qo'llash":"Применить","Boshqa":"Другое",
+"Qanday ishlaydi?":"Как это работает?","Reklama":"Реклама","Fikringizni yozing":"Напишите отзыв","Sharhlar":"Отзывы","Sizning sharhingiz":"Ваш отзыв","Xarid qilgan":"Покупал(а)","Sharh o'chirildi":"Отзыв удалён","Hali sharh yo'q. Birinchi bo'ling!":"Отзывов пока нет. Будьте первым!",
+"Sharhingiz do'kon tomonidan yashirilgan.":"Ваш отзыв скрыт магазином.","Sharhingiz o'chirilsinmi?":"Удалить ваш отзыв?","Sharhingiz saqlandi":"Отзыв сохранён","Sharh yozish uchun avval kiring (Profil bo'limi).":"Войдите, чтобы написать отзыв (раздел «Профиль»).","Like bosish uchun avval kiring (Profil bo'limi)":"Войдите, чтобы ставить лайки (раздел «Профиль»)",
+"Do'kon javobi:":"Ответ магазина:","Yordam xizmati":"Служба поддержки","Muhim":"Важно","Bugun":"Сегодня","YANGI":"НОВОЕ","Tovarlar":"Товары","Ish":"Работа","Fon rangi":"Цвет фона",
+"Tez orada siz bilan bog'lanamiz.":"Мы скоро свяжемся с вами.","Seans tugagan. Qayta kiring":"Сессия истекла. Войдите снова","Bajarilmadi, qayta urinib ko'ring":"Не удалось, попробуйте ещё раз","Tekshirib bo'lmadi, qayta urinib ko'ring":"Не удалось проверить, попробуйте ещё раз",
+"Yoqib bo'lmadi. Keyinroq urinib ko'ring":"Не удалось включить. Попробуйте позже","Internetga ulanib bo'lmadi. Keyinroq urinib ko'ring":"Нет подключения к интернету. Попробуйте позже","Internetni tekshirib, qayta urinib ko'ring.":"Проверьте интернет и попробуйте ещё раз.",
+"Saqlanmadi. Internetni tekshiring":"Не сохранено. Проверьте интернет","Yuborilmadi. Internetni tekshiring":"Не отправлено. Проверьте интернет","Mahsulotlar yuklanmadi.":"Товары не загрузились.","Internetga ulandingiz":"Вы подключились к интернету",
+"Bu qurilmada xabarnoma qo'llab-quvvatlanmaydi":"Это устройство не поддерживает уведомления","Nusxalab bo'lmadi. Raqamni qo'lda belgilang":"Не удалось скопировать. Выделите номер вручную","Havolani qo'lda belgilang":"Выделите ссылку вручную",
+"Rasm yangi oynada ochildi. Bosib turib saqlang":"Изображение открыто в новом окне. Удерживайте, чтобы сохранить","Kattalashtirish uchun rasmni bosing":"Нажмите на фото, чтобы увеличить","Rasmlarni yuklab olish":"Скачать изображения","Yuklab olish":"Скачать",
+"Bu fayl rasm emas yoki formati mos emas. Skrinshot (PNG yoki JPG) yuklang":"Это не изображение или формат не подходит. Загрузите скриншот (PNG или JPG)",
+"Ma'lumot hozircha yo'q.":"Информации пока нет.","Hozircha ball yo'q. Birinchi xariddan keyin shu yerda ko'rinadi.":"Баллов пока нет. После первой покупки они появятся здесь.",
+"Hozircha faol kupon yo'q. Yangi kuponlar shu yerda va «Xabarlar» da chiqadi.":"Активных купонов пока нет. Новые купоны появятся здесь и в «Уведомлениях».","Do'stlar bilan olsangiz — arzonroq":"Берите с друзьями — дешевле",
+"Mahsulotni tanlang, guruhga qo'shiling va do'stlaringizni chaqiring. Guruh to'lgach buyurtma Xitoydan yo'lga chiqadi.":"Выберите товар, вступите в группу и позовите друзей. Когда группа соберётся, заказ отправится из Китая.",
+"Telefon raqam va PIN bilan bir daqiqada ro'yxatdan o'tasiz. Savatingiz saqlanib turadi.":"Регистрация по номеру телефона и PIN занимает минуту. Ваша корзина сохранится.",
+"Telefon raqam va PIN bilan bir daqiqada kirasiz. Yozgan xabarlaringiz shu yerda saqlanadi va javob ham shu yerda chiqadi.":"Вход по номеру телефона и PIN занимает минуту. Ваши сообщения сохраняются здесь, здесь же приходят и ответы.",
+"Yuk (kargo) narxi tovar kelgach, vazniga qarab alohida hisoblanadi.":"Стоимость доставки (карго) считается отдельно по весу, когда товар прибудет.","Yuk (kargo): tovar kelgach hisoblanadi":"Доставка (карго): считается после прибытия товара",
+"Telefon raqam hisobingizning kaliti. Uni o'zgartirish uchun adminga so'rov yuboring.":"Номер телефона — ключ вашего аккаунта. Чтобы его изменить, отправьте запрос администратору.",
+"Assalomu alaykum! 👋 Savolingiz yoki muammoingiz bo'lsa shu yerga yozing — imkon qadar tez javob beramiz.":"Здравствуйте! 👋 Если у вас есть вопрос или проблема, пишите сюда — ответим как можно быстрее.",
+"Tezroq javob olish uchun Telegramda ham yozishingiz mumkin.":"Для более быстрого ответа можете написать и в Telegram.","Tarmoq":"Сеть","tugadi":"закончилось","Bronza":"Бронза","Kumush":"Серебро","Oltin":"Золото","Platina":"Платина","Brilliant":"Бриллиант"
+};
+/* ---- uzun iboralar (bo'lak bo'yicha) ---- */
+var PH=[
+["Hisobni o'chirish — ortga qaytarib bo'lmaydi. Ball va ma'lumotlaringiz yo'qoladi.","Удаление аккаунта необратимо. Баллы и данные будут потеряны."],["Tasdiqlash uchun PIN kiriting:","Введите PIN для подтверждения:"],
+["Siz do'stingiz taklifi bilan keldingiz. Birinchi xaridingiz yetib kelgach, ikkalangizga bonus ball beriladi.","Вы пришли по приглашению друга. Когда придёт ваша первая покупка, вы оба получите бонусные баллы."],
+["Do'stingiz havolangiz orqali ro'yxatdan o'tib, birinchi xaridini olsa, ikkalangizga","Если друг зарегистрируется по вашей ссылке и сделает первую покупку, вы оба получите"],
+["Xitoydan jo'natilgach (odatda 2–3 kundan keyin) shu yerda chiqadi","появится здесь после отправки из Китая (обычно через 2–3 дня)"],["Trek raqam:","Трек-номер:"],
+["Guruh to'lishi uchun yana ","Для сбора группы нужно ещё "],[" kishi kerak"," чел."],["Chegirma yoqilishi uchun yana","Чтобы скидка заработала, ещё"],["darajasigacha yana","— до этого уровня ещё"],["xarid qoldi","покупок"],
+["Siz eng yuqori darajadasiz!","Вы на самом высоком уровне!"],["Ro'yxatdan o'tgan do'stlar:","Зарегистрировались друзья:"],["Xarid qilganlari:","Купили:"],["har buyurtmaga +","за каждый заказ +"],["Har bir yetib kelgan buyurtmadan","С каждого доставленного заказа"],
+["Bitta buyurtmada ko'pi bilan","В одном заказе не более"],["bitta buyurtmada ko'pi bilan","в одном заказе не более"],["ko'pi bilan","не более"],["ball ishlatiladi.","баллов будет использовано."],["ball bor.","баллов."],["Ball ishlatish:","Использовать баллы:"],["(1 ball = 1 so'm)","(1 балл = 1 сум)"],
+["1 ball = 1 so'm","1 балл = 1 сум"],["Kodni savatdagi «Promokod» maydoniga yozing.","Введите код в поле «Промокод» в корзине."],["Promokod qo'llandi","Промокод применён"],["Chegirma: −","Скидка: −"],["Ball: −","Баллы: −"],["Yuk (kargo):","Доставка (карго):"],
+["Chek yuborilmadi:","Чек не отправлен:"],["Chek yuklanmadi:","Чек не загружен:"],["Rasm ochilmadi (","Изображение не открылось ("],["Boshqa rasm tanlang yoki skrinshot oling","Выберите другое фото или сделайте скриншот"],
+["Quyidagi kartaga","Переведите на карту"],["To'lov chekini (skrinshot) yuklang.","Загрузите чек об оплате (скриншот)."],["Salom! Mening ID:","Здравствуйте! Мой ID:"],
+["Raqamimni yangisiga o'zgartirib bering","Прошу изменить мой номер на новый"],["hozirgi raqamim:","мой текущий номер:"],["yangi PIN beramiz.","мы выдадим новый PIN."],["Xitoy tovarlari arzon narxda! Mening havolam orqali kiring:","Товары из Китая по низким ценам! Заходите по моей ссылке:"],
+["Birga olamiz!","Купим вместе!"],["— guruh narxi","— цена в группе"],["% chegirma","% скидка"],["Sizda ","У вас "]
+];
+var RX=[
+[/(\d)\s*(?:so'm|so‘m)\b/g,"$1 сум"],
+[/(\d+)\/(\d+) kishi\b/g,"$1/$2 чел."],
+[/(\d+) kun\b/g,"$1 дн."],[/(\d+) soat\b/g,"$1 ч."],[/(\d+) daqiqa\b/g,"$1 мин."],
+[/(\d+) ta\b/g,"$1 шт."],[/(\d+) ball\b/g,"$1 баллов"],[/(\d+) kishi\b/g,"$1 чел."],
+[/\s+o'tkazing\./g,"."],[/Bronza — до/g,"Бронза — до"],[/Kumush — до/g,"Серебро — до"],[/Oltin — до/g,"Золото — до"],[/Platina — до/g,"Платина — до"],[/Buyurtma #/g,"Заказ #"],[/ID:/g,"ID:"]
+];
+var done=new WeakSet();
+function T(s){
+  if(!s||typeof s!=='string') return s;
+  var k=s.trim(); if(!k) return s;
+  var kk=k.replace(/\s+/g,' ');
+  if(E.hasOwnProperty(kk)){ return s.replace(k,E[kk]); }
+  var o=s,i;
+  for(i=0;i<PH.length;i++){ if(o.indexOf(PH[i][0])>-1) o=o.split(PH[i][0]).join(PH[i][1]); }
+  for(i=0;i<RX.length;i++){ o=o.replace(RX[i][0],RX[i][1]); }
+  return o;
+}
+window.__qsT=T;
+var SKIP='script,style,textarea,.pic,.th,.thumb,.oth,.avpick,.keepe,.pname,[data-keep],[contenteditable]';
+function fix(t){
+  var p=t.parentNode; if(!p||p.nodeType!==1||done.has(t)) return;
+  if(p.closest&&p.closest(SKIP)) return;
+  var v=t.nodeValue, n=T(v); if(n!==v){ t.nodeValue=n; } done.add(t);
+}
+function attrs(el){ ['placeholder','title','aria-label','alt'].forEach(function(a){ var v=el.getAttribute&&el.getAttribute(a); if(v){ var n=T(v); if(n!==v) el.setAttribute(a,n); } }); }
+function walk(n){
+  if(n.nodeType===3){ fix(n); return; }
+  if(n.nodeType!==1) return;
+  attrs(n); if(n.querySelectorAll) n.querySelectorAll('[placeholder],[title],[aria-label]').forEach(attrs);
+  var w=document.createTreeWalker(n,NodeFilter.SHOW_TEXT,null),a=[]; while(w.nextNode()) a.push(w.currentNode); a.forEach(fix);
+}
+new MutationObserver(function(ms){ for(var i=0;i<ms.length;i++){ var m=ms[i]; if(m.type==='characterData'){ done.delete(m.target); fix(m.target); } else m.addedNodes.forEach(walk); } }).observe(document.documentElement,{childList:true,subtree:true,characterData:true});
+document.addEventListener('DOMContentLoaded',function(){ walk(document.body); });
+['alert','confirm','prompt'].forEach(function(f){ var o=window[f]; window[f]=function(a,b){ return o.call(window,T(a),b); }; });
+if(navigator.share){ var os=navigator.share.bind(navigator); navigator.share=function(d){ if(d){ d=Object.assign({},d); if(d.text) d.text=T(d.text); if(d.title) d.title=T(d.title); } return os(d); }; }
+})();
+</script>
+<!--qlang-end-->
 <!--qicons-start-->
 <style>
 .qi{display:inline-block;width:1.15em;height:1.15em;vertical-align:-.22em;color:inherit;line-height:1;flex:none}
@@ -367,9 +477,10 @@ clipb:'<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 11
 arrowup:'<path d="M12 20V5M6 11l6-6 6 6"/>',
 folder:'<path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H9l2 2.5h8.5A1.5 1.5 0 0 1 21 9v9.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z"/>',
 exch:'<path d="M4 8h14M14 4l4 4-4 4M20 16H6M10 12l-4 4 4 4"/>',
+globe:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3.2 3.2 3.2 14.8 0 18M12 3c-3.2 3.2-3.2 14.8 0 18"/>',
 key:'<circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M16 8l3 3M14 10l2 2"/>'
 };
-var M={'🏠':['home'],'🛒':['cart'],'📦':['box'],'👤':['user'],'💬':['chat'],'🔔':['bell'],'🔕':['belloff'],'🌙':['moon'],'☀':['sun'],'🔥':['flame','flame'],'🔍':['search'],'🔎':['search'],'🎁':['gift'],'🎟':['ticket'],'✅':['checkc','ok'],'❌':['xc','bad'],'📡':['signal'],'⏳':['hourglass'],'⌛':['hourglass'],'⏱':['timer'],'❤':['heart','heart fill'],'🤍':['heart'],'🛍':['bag'],'📷':['camera'],'📍':['pin'],'✏':['pencil'],'📤':['share'],'📞':['phone'],'ℹ':['info'],'⬇':['download'],'📮':['mail'],'📭':['mail'],'⭐':['star','gold fill'],'🎉':['sparkle','gold'],'✨':['sparkle','gold'],'💳':['card'],'⚡':['zap'],'💎':['gem'],'🚀':['rocket'],'🎧':['phones'],'🥇':['medal','gold'],'🥈':['medal','silver'],'🥉':['medal','bronze'],'🏆':['trophy','gold'],'👥':['users'],'🔗':['link'],'✈':['plane'],'🔐':['lock'],'🔑':['key'],'🗑':['trash'],'👋':['hand'],'❗':['alert','bad'],'⚠':['warn','warn'],'🏪':['store'],'🎬':['film'],'👁':['eye'],'🙈':['eyeoff'],'🖼':['image'],'📎':['clip'],'📣':['mega'],'📢':['mega'],'🚫':['ban','bad'],'⛔':['ban','bad'],'🧪':['flask'],'⚙':['gear'],'📊':['chart'],'🧾':['receipt'],'🧮':['calc'],'⏰':['alarm'],'➕':['plus'],'📋':['clipb'],'👆':['arrowup'],'🗂':['folder'],'💱':['exch']};
+var M={'🏠':['home'],'🛒':['cart'],'📦':['box'],'👤':['user'],'💬':['chat'],'🔔':['bell'],'🔕':['belloff'],'🌙':['moon'],'☀':['sun'],'🔥':['flame','flame'],'🔍':['search'],'🔎':['search'],'🎁':['gift'],'🎟':['ticket'],'✅':['checkc','ok'],'❌':['xc','bad'],'📡':['signal'],'⏳':['hourglass'],'⌛':['hourglass'],'⏱':['timer'],'❤':['heart','heart fill'],'🤍':['heart'],'🛍':['bag'],'📷':['camera'],'📍':['pin'],'✏':['pencil'],'📤':['share'],'📞':['phone'],'ℹ':['info'],'⬇':['download'],'📮':['mail'],'📭':['mail'],'⭐':['star','gold fill'],'🎉':['sparkle','gold'],'✨':['sparkle','gold'],'💳':['card'],'⚡':['zap'],'💎':['gem'],'🚀':['rocket'],'🎧':['phones'],'🥇':['medal','gold'],'🥈':['medal','silver'],'🥉':['medal','bronze'],'🏆':['trophy','gold'],'👥':['users'],'🔗':['link'],'✈':['plane'],'🔐':['lock'],'🔑':['key'],'🗑':['trash'],'👋':['hand'],'❗':['alert','bad'],'⚠':['warn','warn'],'🏪':['store'],'🎬':['film'],'👁':['eye'],'🙈':['eyeoff'],'🖼':['image'],'📎':['clip'],'📣':['mega'],'📢':['mega'],'🚫':['ban','bad'],'⛔':['ban','bad'],'🧪':['flask'],'⚙':['gear'],'📊':['chart'],'🧾':['receipt'],'🧮':['calc'],'⏰':['alarm'],'➕':['plus'],'📋':['clipb'],'👆':['arrowup'],'🗂':['folder'],'💱':['exch'],'🌐':['globe']};
 var re1=new RegExp('('+Object.keys(M).join('|')+')️?','g'), re0=new RegExp('('+Object.keys(M).join('|')+')');
 var SKIP='.pic,.th,.thumb,.oth,.avpick,.keepe,script,style,textarea,select,option,title,svg,.qi';
 function mk(k){var d=M[k],s=document.createElement('span');s.className='qi'+(d[1]?' '+d[1]:'');s.setAttribute('data-e',k);s.setAttribute('aria-hidden','true');s.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+P[d[0]]+'</svg>';return s}
@@ -407,6 +518,7 @@ if(document.body) start(); document.addEventListener('DOMContentLoaded',start);
     <div><h1 id="brand">q<span>SHOP</span></h1><small id="tagline">Xitoy tovarlari, guruh bilan arzon</small></div>
     <button class="bell" id="bell" aria-label="Bildirishnomalar"><span>🔔</span><small>Xabarlar</small><em class="bn" id="bellN"></em></button>
     <button class="bell" id="theme" aria-label="Fon rangi" style="margin-left:0"><span id="themeI">🌙</span><small id="themeT">Qora</small></button>
+    <button class="bell" id="lang" aria-label="Til" style="margin-left:0"><span>🌐</span><small id="langT">RU</small></button>
   </header>
   <main id="main"><div class="ldr"><div class="ring"></div><span>Yuklanmoqda…</span></div></main>
   <nav id="nav"></nav>
@@ -1624,6 +1736,7 @@ if(document.body) start(); document.addEventListener('DOMContentLoaded',start);
     }
   }
 
+  try{ var lt=document.getElementById('langT'); if(lt) lt.textContent = document.documentElement.getAttribute('lang')==='ru' ? 'UZ' : 'RU'; }catch(e){}
   function themeApply(){
     var l = document.documentElement.getAttribute('data-theme') === 'light';
     var m = document.getElementById('themeMeta'); if (m) m.setAttribute('content', l ? '#f4f2ec' : '#0e0e10');

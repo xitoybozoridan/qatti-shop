@@ -59,6 +59,12 @@ label{font-size:12px;color:var(--muted);display:block;margin:0 0 4px 2px}
 .toast.show{opacity:1}
 .thumb{width:56px;height:56px;border-radius:10px;background:var(--card2);display:grid;place-items:center;font-size:28px;flex:none;overflow:hidden}
 .thumb img{width:100%;height:100%;object-fit:cover}
+.rp,#rp{position:fixed;inset:0;background:var(--bg);z-index:70;overflow:auto;display:none}
+#rp.on{display:block}
+#rp .in{max-width:560px;margin:0 auto;padding:calc(env(safe-area-inset-top) + 14px) 16px 110px}
+.rprow{display:flex;gap:10px;align-items:flex-start;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px;font-size:13px;color:var(--text);cursor:pointer}
+.rprow input{margin-top:3px}
+.rpbar{position:fixed;left:0;right:0;bottom:0;padding:12px 16px calc(env(safe-area-inset-bottom) + 12px);background:var(--bg);border-top:1px solid var(--line);max-width:560px;margin:0 auto}
 .modal{position:fixed;inset:0;background:var(--bg);z-index:60;overflow:auto;display:none}
 .modal.show{display:block}
 .modal .in{max-width:560px;margin:0 auto;padding:calc(env(safe-area-inset-top) + 14px) 16px 40px}
@@ -367,7 +373,7 @@ if(document.body) start(); document.addEventListener('DOMContentLoaded',start);
     var r = await sb.from('settings').select('key,value');
     if (r.error) throw r.error;
     loadAdStats(); loadChatThreads().then(renderNav); loadAnns(); loadRevs(); loadCoupons().then(function(){ cpRender(); if (S.tab === 'texts' && !S.sub && $('view')) render(); });
-    (r.data || []).forEach(function(x){ if (x.key === 'loyalty') S.loyalty = x.value || {}; if (x.key === 'shop') S.shop = x.value || {}; if (x.key === 'info') S.info = x.value || {}; if (x.key === 'calc' && x.value) S.calc = { rate: +x.value.rate || 1750, markup: x.value.markup === undefined ? 30 : +x.value.markup }; if (x.key === 'pay') S.pay = x.value || {}; if (x.key === 'ads') S.ads = normAds(x.value); if (x.key === 'categories') S.cats = (x.value && x.value.list) || []; });
+    (r.data || []).forEach(function(x){ if (x.key === 'loyalty') S.loyalty = x.value || {}; if (x.key === 'shop') S.shop = x.value || {}; if (x.key === 'info') S.info = x.value || {}; if (x.key === 'calc' && x.value) S.calc = { rate: +x.value.rate || 1750, markup: x.value.markup === undefined ? 30 : +x.value.markup }; if (x.key === 'pay') S.pay = x.value || {}; if (x.key === 'price_backup') S.pbak = x.value || null; if (x.key === 'ads') S.ads = normAds(x.value); if (x.key === 'categories') S.cats = (x.value && x.value.list) || []; });
   }
   function sig(){ return S.orders.length + ':' + S.orders.map(function(o){ return o.id + o.status + (o.paid ? 1 : 0) + (+o.shipping || 0) + (o.receipt_thumb ? 1 : 0); }).join(',').length + ':' + (S.orders[0] ? S.orders[0].id : 0); }
   async function refreshTab(tab){
@@ -1177,7 +1183,7 @@ if(document.body) start(); document.addEventListener('DOMContentLoaded',start);
     return '';
   }
   function viewTexts(){
-    var ver = '<div class="muted" style="text-align:center;margin:22px 0 8px;font-size:12px">Admin ilova versiyasi: 2026.11.03-v (ilova rejimi)</div>';
+    var ver = '<div class="muted" style="text-align:center;margin:22px 0 8px;font-size:12px">Admin ilova versiyasi: 2026.11.07-v (ilova rejimi)</div>';
     if (!S.sub) {
       return '<h2 style="margin-top:4px">Sozlamalar</h2>' + pushCard() + SUBS.map(function(x){
         return '<div class="card mn" data-sub="' + x[0] + '"><span class="ic">' + x[1] + '</span><div class="t"><b>' + x[2] + '</b><span class="muted">' + subStatus(x[0]) + '</span></div><span class="go">›</span></div>';
@@ -1236,7 +1242,10 @@ if(document.body) start(); document.addEventListener('DOMContentLoaded',start);
       '<div class="muted" style="margin-bottom:8px">Mahsulot qo\'shishdagi hisoblagich shu kurs va foizdan foydalanadi.</div>' +
       '<label>Yuan kursi (1 ¥ necha so\'m)</label><input id="ys_rate" type="number" inputmode="numeric" value="' + esc(S.calc.rate) + '">' +
       '<label>Ustama foiz (%)</label><input id="ys_mk" type="number" inputmode="numeric" value="' + esc(S.calc.markup) + '">' +
-      '<button class="btn" id="sv_calc">Saqlash</button>';
+      '<button class="btn" id="sv_calc">Saqlash</button>' +
+      '<div class="card" style="margin-top:16px"><b>Mavjud mahsulotlar narxi</b><div class="muted" style="margin:6px 0 10px">Ustamani o\'zgartirsangiz, eski joylangan mahsulotlar narxini ham avtomatik yangilashingiz mumkin. Avval ko\'rib chiqasiz, keyin tasdiqlaysiz.</div>' +
+      '<button class="btn ghost" data-rp="open">💱 Narxlarni yangi ustamaga o\'tkazish</button>' +
+      (S.pbak && S.pbak.items ? '<button class="btn ghost" data-rp="undo" style="margin-top:8px">↩️ Oxirgi o\'zgarishni qaytarish (' + esc(String(S.pbak.at || '').slice(0, 10)) + ', ' + (+S.pbak.from || 0) + '% ← ' + (+S.pbak.to || 0) + '%)</button>' : '') + '</div>';
     return h + ver;
   }
   async function saveSub(k){
@@ -1265,12 +1274,94 @@ if(document.body) start(); document.addEventListener('DOMContentLoaded',start);
       rows = [{ key: 'loyalty', value: lo2, updated_at: now }]; apply = function(){ S.loyalty = lo2; };
     } else if (k === 'calc') {
       var v = { rate: parseFloat($('ys_rate').value) || 1750, markup: parseFloat($('ys_mk').value) || 0 };
+      S._calcPrev = S.calc.markup;
       rows = [{ key: 'calc', value: v, updated_at: now }]; apply = function(){ S.calc = v; };
     } else return;
     var r = await sb.from('settings').upsert(rows);
     if (r.error) { toast('Xatolik: ' + errMsg(r.error)); return; }
     apply(); toast('Saqlandi. Mijozlarda darrov yangilanadi');
+    if (k === 'calc' && S._calcPrev !== undefined && +S.calc.markup !== +S._calcPrev && S.products.length) setTimeout(function(){ openReprice(S._calcPrev, S.calc.markup); }, 350);
   }
+
+  /* ---------- Eski mahsulotlar narxini yangi ustamaga o'tkazish ---------- */
+  function rpCalc(p, o, n){
+    var f = (1 + n / 100) / (1 + o / 100);
+    function adj(x){ x = +x || 0; if (x <= 0) return x; return Math.ceil(Math.round(x * f) / 1000) * 1000; }
+    return { price: adj(p.price), old: adj(p.old_price) };
+  }
+  function rpList(){
+    var o = parseFloat($('rp_o').value), n = parseFloat($('rp_n').value);
+    if (!(o >= 0) || !(n >= 0)) { $('rp_list').innerHTML = '<div class="muted">Foizlarni kiriting</div>'; $('rp_sum').textContent = ''; return; }
+    var cnt = 0, sumOld = 0, sumNew = 0;
+    $('rp_list').innerHTML = S.products.map(function(p){
+      var c = rpCalc(p, o, n), ch = c.price !== +p.price;
+      var chk = $('rp_c' + p.id), on = chk ? chk.checked : true;
+      return '<label class="rprow"><input type="checkbox" id="rp_c' + p.id + '" data-rpid="' + p.id + '"' + (on ? ' checked' : '') + '><span style="flex:1;min-width:0"><b>' + esc(p.name) + '</b>' + (p.active ? '' : ' <span class="muted">(yashirin)</span>') + '<br><span class="muted">' + money(p.price) + ' → </span><b style="color:var(--gold2)">' + money(c.price) + '</b>' +
+        (p.old_price > 0 ? '<br><span class="muted">' + (gm() ? 'yakka ' : 'eski narx ') + money(p.old_price) + ' → ' + money(c.old) + '</span>' : '') + '</span></label>';
+    }).join('');
+    S.products.forEach(function(p){ var chk = $('rp_c' + p.id); if (chk && chk.checked) { var c = rpCalc(p, o, n); cnt++; sumOld += +p.price; sumNew += c.price; } });
+    $('rp_sum').innerHTML = '<b>' + cnt + '</b> ta mahsulot tanlandi' + (sumOld > 0 ? ' · narx o\'rtacha <b>' + (sumNew >= sumOld ? '+' : '') + (((sumNew / sumOld) - 1) * 100).toFixed(1) + '%</b>' : '');
+  }
+  function openReprice(o, n){
+    var el = document.getElementById('rp'); if (!el) { el = document.createElement('div'); el.id = 'rp'; document.body.appendChild(el); }
+    el.innerHTML = '<div class="in"><div class="row sp" style="margin-bottom:6px"><h2 style="margin:0">Narxlarni yangilash</h2><button class="btn ghost small" data-rp="close">Yopish</button></div>' +
+      '<div class="muted" style="margin-bottom:10px">Tannarx hozirgi narxdan qaytarib hisoblanadi, so\'ng yangi ustama qo\'shiladi va 1 000 so\'mgacha yaxlitlanadi. Xato bo\'lishi mumkin bo\'lgan mahsulotlardan belgini olib tashlang. Oldingi buyurtmalarga ta\'sir qilmaydi.</div>' +
+      '<div class="row" style="gap:10px"><div style="flex:1"><label>Hozirgi narxlardagi ustama (%)</label><input id="rp_o" type="number" inputmode="decimal" value="' + esc(o) + '"></div>' +
+      '<div style="flex:1"><label>Yangi ustama (%)</label><input id="rp_n" type="number" inputmode="decimal" value="' + esc(n) + '"></div></div>' +
+      '<div id="rp_sum" class="muted" style="margin:2px 0 8px"></div><div id="rp_list"></div>' +
+      '<div class="rpbar"><button class="btn" data-rp="apply">Tanlanganlarga qo\'llash</button></div></div>';
+    el.className = 'on'; rpList();
+  }
+  async function rpApply(btn){
+    var o = parseFloat($('rp_o').value), n = parseFloat($('rp_n').value);
+    if (!(o >= 0) || !(n >= 0)) { toast('Foizlarni kiriting'); return; }
+    var sel = S.products.filter(function(p){ var c = $('rp_c' + p.id); return c && c.checked; });
+    if (!sel.length) { toast('Mahsulot tanlanmagan'); return; }
+    if (!confirm(sel.length + ' ta mahsulot narxi ' + o + '% dan ' + n + '% ga o\'zgartiriladi. Davom etamizmi?')) return;
+    btn.disabled = true; btn.textContent = 'Yangilanmoqda...';
+    var items = {}, jobs = [];
+    sel.forEach(function(p){ var c = rpCalc(p, o, n); items[p.id] = [+p.price, +p.old_price || 0]; jobs.push({ id: p.id, price: c.price, old: c.old }); });
+    var bak = { at: new Date().toISOString(), from: o, to: n, items: items };
+    var br = await sb.from('settings').upsert([{ key: 'price_backup', value: bak, updated_at: bak.at }]);
+    if (br.error) { toast('Zaxira saqlanmadi: ' + errMsg(br.error)); btn.disabled = false; btn.textContent = "Tanlanganlarga qo'llash"; return; }
+    var fail = 0;
+    for (var i = 0; i < jobs.length; i += 5) {
+      var rs = await Promise.all(jobs.slice(i, i + 5).map(function(j){ return sb.from('products').update({ price: j.price, old_price: j.old }).eq('id', j.id); }));
+      rs.forEach(function(r){ if (r.error) fail++; });
+    }
+    S.pbak = bak;
+    if (+S.calc.markup !== n) {
+      var v = { rate: S.calc.rate, markup: n };
+      var cr = await sb.from('settings').upsert([{ key: 'calc', value: v, updated_at: bak.at }]); if (!cr.error) S.calc = v;
+    }
+    try { await loadProducts(); } catch(e){}
+    document.getElementById('rp').className = ''; render();
+    toast(fail ? (jobs.length - fail) + ' ta yangilandi, ' + fail + ' tasida xatolik' : jobs.length + ' ta mahsulot narxi yangilandi');
+  }
+  async function rpUndo(){
+    var b = S.pbak; if (!b || !b.items) { toast('Qaytariladigan o\'zgarish yo\'q'); return; }
+    var ids = Object.keys(b.items);
+    if (!confirm(ids.length + ' ta mahsulot narxi oldingi holatga qaytariladi (ustama ' + b.from + '%). Davom etamizmi?')) return;
+    var fail = 0;
+    for (var i = 0; i < ids.length; i += 5) {
+      var rs = await Promise.all(ids.slice(i, i + 5).map(function(id){ return sb.from('products').update({ price: b.items[id][0], old_price: b.items[id][1] }).eq('id', id); }));
+      rs.forEach(function(r){ if (r.error) fail++; });
+    }
+    var v = { rate: S.calc.rate, markup: +b.from }; var cr = await sb.from('settings').upsert([{ key: 'calc', value: v, updated_at: new Date().toISOString() }]); if (!cr.error) S.calc = v;
+    await sb.from('settings').upsert([{ key: 'price_backup', value: { used: true }, updated_at: new Date().toISOString() }]); S.pbak = null;
+    try { await loadProducts(); } catch(e){}
+    render(); toast(fail ? 'Qaytarildi, ' + fail + ' tasida xatolik' : 'Narxlar qaytarildi');
+  }
+  document.addEventListener('click', function(e){
+    var t = e.target.closest && e.target.closest('[data-rp]'); if (!t) return;
+    var a = t.dataset.rp;
+    if (a === 'open') openReprice(S.calc.markup, S.calc.markup);
+    else if (a === 'close') document.getElementById('rp').className = '';
+    else if (a === 'apply') rpApply(t);
+    else if (a === 'undo') rpUndo();
+  });
+  document.addEventListener('input', function(e){ if (e.target && (e.target.id === 'rp_o' || e.target.id === 'rp_n')) rpList(); });
+  document.addEventListener('change', function(e){ if (e.target && e.target.dataset && e.target.dataset.rpid !== undefined) rpList(); });
 
   /* ---------- Statistika ---------- */
   /* ---------- Mijozlar ---------- */

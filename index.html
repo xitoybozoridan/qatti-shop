@@ -414,10 +414,11 @@ if(document.body) start(); document.addEventListener('DOMContentLoaded',start);
 <div id="app">
   <header>
     <div class="logo">qSH</div>
-    <div><h1 id="brand">q<span>SHOP</span></h1><small id="tagline">Xitoy tovarlari, guruh bilan arzon</small></div>
+    <div><h1 id="brand"></h1><small id="tagline"></small></div>
     <button class="bell" id="bell" aria-label="Bildirishnomalar"><span>🔔</span><small>Xabarlar</small><em class="bn" id="bellN"></em></button>
     <button class="bell" id="theme" aria-label="Fon rangi" style="margin-left:0"><span id="themeI">🌙</span><small id="themeT">Qora</small></button>
   </header>
+  <script>/*brand-cache*/(function(){try{var c=JSON.parse(localStorage.getItem('qs_brand')||'null');if(!c)return;var m=String(c.n||'').match(/^([a-z]+)([A-Z].*)$/);var b=document.getElementById('brand');if(m){b.textContent=m[1];var sp=document.createElement('span');sp.textContent=m[2];b.appendChild(sp)}else b.textContent=c.n||'';document.getElementById('tagline').textContent=c.t||''}catch(e){}})();</script>
   <main id="main"><div class="ldr"><div class="ring"></div><span>Yuklanmoqda…</span></div></main>
   <nav id="nav"></nav>
 </div>
@@ -552,6 +553,7 @@ if(document.body) start(); document.addEventListener('DOMContentLoaded',start);
     $('brand').innerHTML = brandHtml(state.shop.name);
     $('tagline').textContent = state.shop.tagline || '';
     document.title = state.shop.name || 'qSHOP';
+    try{ localStorage.setItem('qs_brand', JSON.stringify({n: state.shop.name || '', t: state.shop.tagline || ''})); }catch(e){}
   }
   async function loadData(){
     if (sb) {

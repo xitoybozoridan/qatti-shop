@@ -846,7 +846,7 @@ if(document.body) start(); document.addEventListener('DOMContentLoaded',start);
   function rcptBoxHtml(){
     if (state.rcpt) return '<div class="row" style="gap:12px;align-items:center"><img class="rc" data-rview="1" src="' + esc(state.rcpt.thumb) + '" alt="chek"><div><div style="font-weight:700;font-size:14px">✅ Chek yuklandi</div><div class="muted" style="font-size:12px">Kattalashtirish uchun rasmni bosing</div>' +
       '<button class="btn small ghost" style="margin-top:6px" data-rmrc="1">Olib tashlash</button></div></div>';
-    return '<label class="btn ghost" for="rc_file" style="display:block;text-align:center;margin-top:4px">📷 To\'lov chekini yuklash' + (payReq() ? ' *' : '') + '</label><label for="rc_file2" class="muted" style="display:block;text-align:center;margin-top:8px;font-size:12px;text-decoration:underline">Rasm ochilmasa: Fayllar orqali tanlash</label>';
+    return '<label class="btn ghost" for="rc_file2" style="display:block;text-align:center;margin-top:4px">📷 To\'lov chekini yuklash' + (payReq() ? ' *' : '') + '</label>';
   }
   function payBoxHtml(total){
     var pc = state.pay; if (!pc.card) return '';
@@ -865,7 +865,7 @@ if(document.body) start(); document.addEventListener('DOMContentLoaded',start);
   }
   function renderOrders(){
     if (!state.orders.length) return '<div class="empty"><b>📦</b>Hali buyurtma yo\'q.</div>';
-    return '<input type="file" id="rc_late" accept="image/*" style="display:none">' + state.orders.slice().reverse().map(function(o){
+    return '<input type="file" id="rc_late" style="display:none">' + state.orders.slice().reverse().map(function(o){
       return '<div class="order"><b>#' + esc(o.no) + '</b> · ' + esc(o.date) + '<br>' +
         o.items.map(function(i){ var sp = splitOpt(i.name); return '<div style="margin-bottom:6px"><b>' + esc(sp.name) + '</b> × ' + i.qty + (i.group ? ' (guruh)' : '') + sp.opts.map(function(x){ return '<div class="muted" style="margin-left:10px">' + esc(x) + '</div>'; }).join('') + '</div>'; }).join('') +
         '<br>Tovarlar: <b>' + money(o.total + (+o.discount || 0) + (+o.bonus || 0)) + '</b><br>' + (+o.discount > 0 ? '🎟 Kupon ' + esc(o.coupon) + ': <b style="color:#6fcf97">−' + money(o.discount) + '</b><br>' : '') + (+o.bonus > 0 ? '🎁 Ball: <b style="color:#6fcf97">−' + money(o.bonus) + '</b><br>' : '') + shipHtml(o) + trackHtml(o) + statusHtml(o.no) + orderPayHtml(o) + '</div>';

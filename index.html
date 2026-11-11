@@ -1393,7 +1393,23 @@ if(document.body) start(); document.addEventListener('DOMContentLoaded',start);
     if (img.close) img.close();
     return c.toDataURL('image/jpeg', q);
   }
+  /* Telefon rasmni ocholmasa (nostandart JPEG va h.k.) — faylni o'zini yuboramiz */
+  async function rawReceipt(file){
+    var buf = await file.arrayBuffer(), u = new Uint8Array(buf), mime = '';
+    if (u[0] === 0xFF && u[1] === 0xD8 && u[2] === 0xFF) mime = 'image/jpeg';
+    else if (u[0] === 0x89 && u[1] === 0x50 && u[2] === 0x4E && u[3] === 0x47) mime = 'image/png';
+    else if (u[0] === 0x52 && u[1] === 0x49 && u[2] === 0x46 && u[3] === 0x46 && u[8] === 0x57 && u[9] === 0x45 && u[10] === 0x42 && u[11] === 0x50) mime = 'image/webp';
+    if (!mime) { var hx = Array.prototype.slice.call(u.subarray(0, 4)).map(function(x){ return ('0' + x.toString(16)).slice(-2); }).join(''); throw new Error('format:' + hx); }
+    if (u.length > 420000) throw new Error('Rasm juda katta');
+    var bin = '', i; for (i = 0; i < u.length; i += 8192) bin += String.fromCharCode.apply(null, u.subarray(i, i + 8192));
+    var full = 'data:' + mime + ';base64,' + btoa(bin);
+    return { full: full, thumb: full.length < 120000 ? full : 'data:image/gif;base64,R0lGODlhAQABAIAAAMLCwgAAACH5BAAAAAAALAAAAAABAAEAAAICRAEAOw==' };
+  }
   async function readReceipt(file){
+    try { return await readReceiptCanvas(file); }
+    catch(e){ if (e && e.message === 'format') return await rawReceipt(file); throw e; }
+  }
+  async function readReceiptCanvas(file){
     var full = await makeJpeg(file, 1100, 0.72);
     if (full.length > 600000) full = await makeJpeg(file, 900, 0.55);
     if (full.length > 650000) full = await makeJpeg(file, 700, 0.5);
@@ -1408,14 +1424,14 @@ if(document.body) start(); document.addEventListener('DOMContentLoaded',start);
       if (r.data && r.data.error) { toast(r.data.error); return; }
       state.orders.forEach(function(o){ if (String(o.no) === String(no)) o.thumb = rc.thumb; }); save('qs_orders', state.orders);
       toast('Chek yuborildi'); if (state.tab === 'orders') render();
-    } catch(e){ toast(e.message === 'format' ? 'Bu fayl rasm emas yoki formati mos emas. Skrinshot (PNG yoki JPG) yuklang' : 'Chek yuborilmadi: ' + (e.message || '')); }
+    } catch(e){ toast(String(e.message).indexOf('format') === 0 ? 'Bu fayl rasm emas yoki formati mos emas. Skrinshot (PNG yoki JPG) yuklang' : 'Chek yuborilmadi: ' + (e.message || '')); }
   }
   document.addEventListener('change', async function(e){
     var t = e.target; if (!t || !t.files || !t.files[0]) return;
     var f = t.files[0];
     if (t.id === 'rc_file') {
       try { state.rcpt = await readReceipt(f); var bx = $('rcpt_box'); if (bx) bx.innerHTML = rcptBoxHtml(); toast('Chek yuklandi'); }
-      catch(err){ toast(err.message === 'format' ? 'Rasm ochilmadi (' + (f.type || 'turi nomalum') + ', ' + Math.round((f.size || 0) / 1024) + ' KB). Boshqa rasm tanlang yoki skrinshot oling' : 'Chek yuklanmadi: ' + (err.message || '')); }
+      catch(err){ toast(String(err.message).indexOf('format') === 0 ? 'Rasm ochilmadi (' + (f.type || 'turi nomalum') + ', ' + String(err.message).slice(7) + ' '  + Math.round((f.size || 0) / 1024) + ' KB). Boshqa rasm tanlang yoki skrinshot oling' : 'Chek yuklanmadi: ' + (err.message || '')); }
       t.value = '';
     } else if (t.id === 'rc_late') { var no = state.attachNo; t.value = ''; if (no) lateReceipt(f, no); }
   });

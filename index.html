@@ -846,7 +846,7 @@ if(document.body) start(); document.addEventListener('DOMContentLoaded',start);
   function rcptBoxHtml(){
     if (state.rcpt) return '<div class="row" style="gap:12px;align-items:center"><img class="rc" data-rview="1" src="' + esc(state.rcpt.thumb) + '" alt="chek"><div><div style="font-weight:700;font-size:14px">✅ Chek yuklandi</div><div class="muted" style="font-size:12px">Kattalashtirish uchun rasmni bosing</div>' +
       '<button class="btn small ghost" style="margin-top:6px" data-rmrc="1">Olib tashlash</button></div></div>';
-    return '<label class="btn ghost" for="rc_file" style="display:block;text-align:center;margin-top:4px">📷 To\'lov chekini yuklash' + (payReq() ? ' *' : '') + '</label>';
+    return '<label class="btn ghost" for="rc_file" style="display:block;text-align:center;margin-top:4px">📷 To\'lov chekini yuklash' + (payReq() ? ' *' : '') + '</label><label for="rc_file2" class="muted" style="display:block;text-align:center;margin-top:8px;font-size:12px;text-decoration:underline">Rasm ochilmasa: Fayllar orqali tanlash</label>';
   }
   function payBoxHtml(total){
     var pc = state.pay; if (!pc.card) return '';
@@ -855,7 +855,7 @@ if(document.body) start(); document.addEventListener('DOMContentLoaded',start);
       '<div class="cardno"><b>' + esc(fmtCard(pc.card)) + '</b><button class="btn small ghost" data-copy="' + esc(String(pc.card).replace(/\s+/g, '')) + '">Nusxalash</button></div>' +
       (pc.holder ? '<div class="muted" style="margin-bottom:6px">👤 ' + esc(pc.holder) + '</div>' : '') +
       (pc.note ? '<div class="muted" style="margin-bottom:8px;font-size:12px">' + esc(pc.note) + '</div>' : '') +
-      '<input type="file" id="rc_file" accept="image/*" style="display:none"><div id="rcpt_box">' + rcptBoxHtml() + '</div></div>';
+      '<input type="file" id="rc_file" accept="image/*" style="display:none"><input type="file" id="rc_file2" style="display:none"><div id="rcpt_box">' + rcptBoxHtml() + '</div></div>';
   }
   function orderPayHtml(o){
     if (o.paid) return '<div style="margin-top:6px;color:#6fcf97">✅ To\'lov qabul qilindi</div>';
@@ -1400,8 +1400,15 @@ if(document.body) start(); document.addEventListener('DOMContentLoaded',start);
     if (m.indexOf('format') === 0) return 'Rasm ochilmadi (' + ((f && f.type) || 'turi nomalum') + '). Boshqa rasm tanlang yoki skrinshot oling';
     return 'Chek yuklanmadi: ' + m;
   }
+  async function readBytes(file){
+    var errs = [];
+    try { return await file.arrayBuffer(); } catch(e1){ errs.push(e1); }
+    try { return await new Promise(function(res, rej){ var fr = new FileReader(); fr.onload = function(){ res(fr.result); }; fr.onerror = function(){ rej(fr.error || new Error('read')); }; fr.readAsArrayBuffer(file); }); } catch(e2){ errs.push(e2); }
+    try { var u = URL.createObjectURL(file); try { var r = await fetch(u); return await r.arrayBuffer(); } finally { URL.revokeObjectURL(u); } } catch(e3){ errs.push(e3); }
+    throw errs[0];
+  }
   async function rawReceipt(file){
-    var buf = await file.arrayBuffer(), u = new Uint8Array(buf), mime = '';
+    var buf = await readBytes(file), u = new Uint8Array(buf), mime = '';
     if (u[0] === 0xFF && u[1] === 0xD8 && u[2] === 0xFF) mime = 'image/jpeg';
     else if (u[0] === 0x89 && u[1] === 0x50 && u[2] === 0x4E && u[3] === 0x47) mime = 'image/png';
     else if (u[0] === 0x52 && u[1] === 0x49 && u[2] === 0x46 && u[3] === 0x46 && u[8] === 0x57 && u[9] === 0x45 && u[10] === 0x42 && u[11] === 0x50) mime = 'image/webp';
@@ -1435,7 +1442,7 @@ if(document.body) start(); document.addEventListener('DOMContentLoaded',start);
   document.addEventListener('change', async function(e){
     var t = e.target; if (!t || !t.files || !t.files[0]) return;
     var f = t.files[0];
-    if (t.id === 'rc_file') {
+    if (t.id === 'rc_file' || t.id === 'rc_file2') {
       try { state.rcpt = await readReceipt(f); var bx = $('rcpt_box'); if (bx) bx.innerHTML = rcptBoxHtml(); toast('Chek yuklandi'); }
       catch(err){ toast(rcErr(err, f)); }
       t.value = '';

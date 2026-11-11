@@ -1394,6 +1394,12 @@ if(document.body) start(); document.addEventListener('DOMContentLoaded',start);
     return c.toDataURL('image/jpeg', q);
   }
   /* Telefon rasmni ocholmasa (nostandart JPEG va h.k.) — faylni o'zini yuboramiz */
+  function rcErr(err, f){
+    var m = String((err && err.message) || ''), n = String((err && err.name) || '');
+    if (n === 'NotReadableError' || /could not be read|permission/i.test(m)) return "Telefon bu faylni ochishga ruxsat bermadi. Chekni Galereyadan tanlang yoki skrinshotni qaytadan oling (Telegram/Yuklamalar papkasidan emas)";
+    if (m.indexOf('format') === 0) return 'Rasm ochilmadi (' + ((f && f.type) || 'turi nomalum') + '). Boshqa rasm tanlang yoki skrinshot oling';
+    return 'Chek yuklanmadi: ' + m;
+  }
   async function rawReceipt(file){
     var buf = await file.arrayBuffer(), u = new Uint8Array(buf), mime = '';
     if (u[0] === 0xFF && u[1] === 0xD8 && u[2] === 0xFF) mime = 'image/jpeg';
@@ -1424,14 +1430,14 @@ if(document.body) start(); document.addEventListener('DOMContentLoaded',start);
       if (r.data && r.data.error) { toast(r.data.error); return; }
       state.orders.forEach(function(o){ if (String(o.no) === String(no)) o.thumb = rc.thumb; }); save('qs_orders', state.orders);
       toast('Chek yuborildi'); if (state.tab === 'orders') render();
-    } catch(e){ toast(String(e.message).indexOf('format') === 0 ? 'Bu fayl rasm emas yoki formati mos emas. Skrinshot (PNG yoki JPG) yuklang' : 'Chek yuborilmadi: ' + (e.message || '')); }
+    } catch(e){ toast(rcErr(e, file)); }
   }
   document.addEventListener('change', async function(e){
     var t = e.target; if (!t || !t.files || !t.files[0]) return;
     var f = t.files[0];
     if (t.id === 'rc_file') {
       try { state.rcpt = await readReceipt(f); var bx = $('rcpt_box'); if (bx) bx.innerHTML = rcptBoxHtml(); toast('Chek yuklandi'); }
-      catch(err){ toast(String(err.message).indexOf('format') === 0 ? 'Rasm ochilmadi (' + (f.type || 'turi nomalum') + ', ' + String(err.message).slice(7) + ' '  + Math.round((f.size || 0) / 1024) + ' KB). Boshqa rasm tanlang yoki skrinshot oling' : 'Chek yuklanmadi: ' + (err.message || '')); }
+      catch(err){ toast(rcErr(err, f)); }
       t.value = '';
     } else if (t.id === 'rc_late') { var no = state.attachNo; t.value = ''; if (no) lateReceipt(f, no); }
   });
